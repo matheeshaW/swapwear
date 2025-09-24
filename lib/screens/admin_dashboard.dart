@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/admin_service.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -37,20 +38,49 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _editUserDialog(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final nameCtrl = TextEditingController(text: doc.data()?['name'] ?? '');
-    final prefs = (doc.data()?['preferences'] as List<dynamic>? ?? [])
-        .cast<String>();
+    final data = doc.data() ?? {};
+    final email = (data['email'] ?? doc.id) as String;
+    final nameCtrl = TextEditingController(text: data['name'] ?? '');
+    final prefs = (data['preferences'] as List<dynamic>? ?? []).cast<String>();
     final prefsCtrl = TextEditingController(text: prefs.join(', '));
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Edit ${doc.id}'),
+          title: Text('Edit $email'),
           content: SizedBox(
             width: 400,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'User ID',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: SelectableText(doc.id, maxLines: 1),
+                    ),
+                    IconButton(
+                      tooltip: 'Copy UID',
+                      icon: const Icon(Icons.copy),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: doc.id));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('User ID copied')),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: nameCtrl,
                   decoration: const InputDecoration(labelText: 'Name'),
