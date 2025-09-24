@@ -6,6 +6,7 @@ import 'screens/signup_screen.dart';
 import 'services/profile_service.dart';
 import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard.dart';
+import 'screens/home_scaffold.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,45 +54,8 @@ class AuthGate extends StatelessWidget {
 
         // Ensure Firestore profile exists for authenticated users
         ProfileService().ensureUserProfile(user: user);
-        return const HomePage();
+        return const HomeScaffold();
       },
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    return Scaffold(
-      appBar: AppBar(title: const Text('SwapWear')),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Logged in as: ${user?.email ?? user?.uid ?? 'Unknown'}'),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pushNamed('/profile'),
-              child: const Text('Profile'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pushNamed('/admin'),
-              child: const Text('Admin Dashboard'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-              },
-              child: const Text('Logout'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
