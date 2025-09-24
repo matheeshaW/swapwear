@@ -85,7 +85,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Your Profile')),
+      appBar: AppBar(
+        title: const Text('Your Profile'),
+        actions: [
+          IconButton(
+            onPressed: _isLoading
+                ? null
+                : () async {
+                    await FirebaseAuth.instance.signOut();
+                  },
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
