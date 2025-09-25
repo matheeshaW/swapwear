@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "697624814702-88ul3inot43cjie1nuc13sra4e4pbsll.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.swapwear",
+            "certificate_hash": "791eca56ed732e6930279d2909b7786004b73ba8"
+          }
+        },
+        {
           "client_id": "697624814702-jgoq3c7264l4nm1n1h5cj5hhgu43rg8t.apps.googleusercontent.com",
           "client_type": 3
         }
