@@ -247,7 +247,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         validator: (v) {
                           if (v == null || v.isEmpty)
                             return 'Password is required';
-                          if (v.length < 6) return 'Min 6 characters';
+                          if (v.length < 8) return 'Min 8 characters';
+                          if (!RegExp(r'[A-Z]').hasMatch(v))
+                            return 'At least one uppercase letter';
+                          if (!RegExp(r'[a-z]').hasMatch(v))
+                            return 'At least one lowercase letter';
+                          if (!RegExp(r'[0-9]').hasMatch(v))
+                            return 'At least one number';
+                          if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(v))
+                            return 'At least one special character';
                           return null;
                         },
                       ),
