@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
+import '../services/storage_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,6 +21,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   String? _error;
   bool _uploading = false;
+  bool _photoUploading = false;
 
   late final String _uid;
 
@@ -118,6 +120,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _changeProfilePhoto() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1024,
+      );
+      if (picked == null) return;
+      setState(() => _photoUploading = true);
+      final bytes = await picked.readAsBytes();
+      final url = await StorageService().uploadProfilePhoto(
+        uid: _uid,
+        bytes: bytes,
+      );
+      await FirebaseFirestore.instance.collection('users').doc(_uid).update({
+        'profilePic': url,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await _loadProfile();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile photo updated')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Failed to update photo');
+    } finally {
+      if (mounted) setState(() => _photoUploading = false);
+    }
+  }
+
+  Future<void> _removeProfilePhoto() async {
+    try {
+      setState(() => _photoUploading = true);
+      await StorageService().deleteProfilePhoto(uid: _uid);
+      await FirebaseFirestore.instance.collection('users').doc(_uid).update({
+        'profilePic': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await _loadProfile();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile photo removed')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Failed to remove photo');
+    } finally {
+      if (mounted) setState(() => _photoUploading = false);
+    }
+  }
+
   Future<void> _analyzeAndAppend(Uint8List bytes, String filename) async {
     setState(() {
       _uploading = true;
@@ -181,6 +236,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(_error!, style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 12),
                     ],
+                    // Avatar row
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(_uid)
+                          .snapshots(),
+                      builder: (context, snap) {
+                        final pic =
+                            snap.data?.data()?['profilePic'] as String? ??
+                            _photoController.text.trim();
+                        return Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 36,
+                              backgroundImage: (pic.isNotEmpty)
+                                  ? NetworkImage(pic)
+                                  : null,
+                              child: (pic.isEmpty)
+                                  ? const Icon(Icons.person, size: 36)
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: _photoUploading
+                                  ? null
+                                  : _changeProfilePhoto,
+                              icon: _photoUploading
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.photo_camera_back_outlined,
+                                    ),
+                              label: const Text('Change photo'),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: (_photoUploading || (pic.isEmpty))
+                                  ? null
+                                  : _removeProfilePhoto,
+                              icon: const Icon(Icons.delete_outline),
+                              label: const Text('Remove'),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _nameController,
                       decoration: const InputDecoration(labelText: 'Name'),
