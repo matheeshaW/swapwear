@@ -178,6 +178,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       return const Scaffold(body: Center(child: Text('Access denied')));
     }
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
         actions: [
@@ -195,58 +196,88 @@ class _AdminDashboardState extends State<AdminDashboard> {
           }
           final docs = snapshot.data!.docs;
           if (docs.isEmpty) return const Center(child: Text('No users'));
-          return ListView.separated(
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
             itemCount: docs.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final d = docs[index].data();
               final uid = docs[index].id;
-              return ListTile(
-                title: Text(
-                  d['name']?.toString().isNotEmpty == true
-                      ? d['name']
-                      : d['email'] ?? uid,
-                ),
-                subtitle: Text(d['email'] ?? uid),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      onPressed: () => _editUserDialog(docs[index]),
-                      icon: const Icon(Icons.edit),
-                    ),
-                    IconButton(
-                      onPressed: () async {
-                        final confirmed =
-                            await showDialog<bool>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Deactivate user?'),
-                                content: Text(
-                                  'This will delete profile for $uid.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            ) ??
-                            false;
-                        if (confirmed) {
-                          await _adminService.deleteUser(uid);
-                        }
-                      },
-                      icon: const Icon(Icons.delete),
+              final title = d['name']?.toString().isNotEmpty == true
+                  ? d['name']
+                  : d['email'] ?? uid;
+              final email = d['email'] ?? uid;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
                     ),
                   ],
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.indigo[50],
+                    child: const Icon(
+                      Icons.person_outline,
+                      color: Color(0xFF667eea),
+                    ),
+                  ),
+                  title: Text(
+                    title.toString(),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(email.toString()),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Edit',
+                        onPressed: () => _editUserDialog(docs[index]),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete',
+                        onPressed: () async {
+                          final confirmed =
+                              await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Deactivate user?'),
+                                  content: Text(
+                                    'This will delete profile for $uid.',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+                          if (confirmed) {
+                            await _adminService.deleteUser(uid);
+                          }
+                        },
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
