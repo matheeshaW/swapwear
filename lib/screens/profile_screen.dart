@@ -291,54 +291,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 children: [
                                   const SizedBox(height: 8),
                                   Center(
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 56,
-                                          backgroundColor: Colors.grey[100],
-                                          backgroundImage: (pic.isNotEmpty)
-                                              ? NetworkImage(pic)
-                                              : null,
-                                          child: (pic.isEmpty)
-                                              ? const Icon(
-                                                  Icons.person,
-                                                  size: 56,
-                                                )
-                                              : null,
-                                        ),
-                                        Positioned(
-                                          right: -6,
-                                          bottom: -40,
-                                          child: ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              shape: const CircleBorder(),
-                                              padding: const EdgeInsets.all(8),
-                                            ),
-                                            onPressed: _photoUploading
-                                                ? null
-                                                : _changeProfilePhoto,
-                                            child: _photoUploading
-                                                ? const SizedBox(
-                                                    height: 16,
-                                                    width: 16,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                        ),
+                                    child: SizedBox(
+                                      height:
+                                          152, // 56*2 + 40 (avatar + button offset)
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 56,
+                                            backgroundColor: Colors.grey[100],
+                                            backgroundImage: (pic.isNotEmpty)
+                                                ? NetworkImage(pic)
+                                                : null,
+                                            child: (pic.isEmpty)
+                                                ? const Icon(
+                                                    Icons.person,
+                                                    size: 56,
                                                   )
-                                                : const Icon(
-                                                    Icons.edit,
-                                                    size: 16,
-                                                  ),
+                                                : null,
                                           ),
-                                        ),
-                                        if (pic.isNotEmpty)
                                           Positioned(
-                                            left: -6,
-                                            bottom: -40,
-                                            child: OutlinedButton(
-                                              style: OutlinedButton.styleFrom(
+                                            right: -6,
+                                            bottom: 0,
+                                            child: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
                                                 shape: const CircleBorder(),
                                                 padding: const EdgeInsets.all(
                                                   8,
@@ -346,14 +322,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               ),
                                               onPressed: _photoUploading
                                                   ? null
-                                                  : _removeProfilePhoto,
-                                              child: const Icon(
-                                                Icons.delete_outline,
-                                                size: 16,
-                                              ),
+                                                  : _changeProfilePhoto,
+                                              child: _photoUploading
+                                                  ? const SizedBox(
+                                                      height: 16,
+                                                      width: 16,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.edit,
+                                                      size: 16,
+                                                    ),
                                             ),
                                           ),
-                                      ],
+                                          if (pic.isNotEmpty)
+                                            Positioned(
+                                              left: -6,
+                                              bottom: 0,
+                                              child: OutlinedButton(
+                                                style: OutlinedButton.styleFrom(
+                                                  shape: const CircleBorder(),
+                                                  padding: const EdgeInsets.all(
+                                                    8,
+                                                  ),
+                                                ),
+                                                onPressed: _photoUploading
+                                                    ? null
+                                                    : _removeProfilePhoto,
+                                                child: const Icon(
+                                                  Icons.delete_outline,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 48),
