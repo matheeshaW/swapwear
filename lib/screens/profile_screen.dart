@@ -236,7 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(_error!, style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 12),
                     ],
-                    // Avatar row
+                    // Avatar - centered with edit and delete actions
                     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                       stream: FirebaseFirestore.instance
                           .collection('users')
@@ -246,43 +246,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         final pic =
                             snap.data?.data()?['profilePic'] as String? ??
                             _photoController.text.trim();
-                        return Row(
+                        return Column(
                           children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundImage: (pic.isNotEmpty)
-                                  ? NetworkImage(pic)
-                                  : null,
-                              child: (pic.isEmpty)
-                                  ? const Icon(Icons.person, size: 36)
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: _photoUploading
-                                  ? null
-                                  : _changeProfilePhoto,
-                              icon: _photoUploading
-                                  ? const SizedBox(
-                                      height: 16,
-                                      width: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                            const SizedBox(height: 8),
+                            Center(
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 56,
+                                    backgroundImage: (pic.isNotEmpty)
+                                        ? NetworkImage(pic)
+                                        : null,
+                                    child: (pic.isEmpty)
+                                        ? const Icon(Icons.person, size: 56)
+                                        : null,
+                                  ),
+                                  Positioned(
+                                    right: -6,
+                                    bottom: -40,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        shape: const CircleBorder(),
+                                        padding: const EdgeInsets.all(8),
                                       ),
-                                    )
-                                  : const Icon(
-                                      Icons.photo_camera_back_outlined,
+                                      onPressed: _photoUploading
+                                          ? null
+                                          : _changeProfilePhoto,
+                                      child: _photoUploading
+                                          ? const SizedBox(
+                                              height: 16,
+                                              width: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.edit, size: 16),
                                     ),
-                              label: const Text('Change photo'),
+                                  ),
+                                  if (pic.isNotEmpty)
+                                    Positioned(
+                                      left: -6,
+                                      bottom: -40,
+                                      child: OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                          shape: const CircleBorder(),
+                                          padding: const EdgeInsets.all(8),
+                                        ),
+                                        onPressed: _photoUploading
+                                            ? null
+                                            : _removeProfilePhoto,
+                                        child: const Icon(
+                                          Icons.delete_outline,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              onPressed: (_photoUploading || (pic.isEmpty))
-                                  ? null
-                                  : _removeProfilePhoto,
-                              icon: const Icon(Icons.delete_outline),
-                              label: const Text('Remove'),
-                            ),
+                            const SizedBox(height: 16),
                           ],
                         );
                       },
