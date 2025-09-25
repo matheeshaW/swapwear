@@ -209,6 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('Your Profile'),
         actions: [
@@ -226,214 +227,434 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_error != null) ...[
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                    ],
-                    // Avatar - centered with edit and delete actions
-                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(_uid)
-                          .snapshots(),
-                      builder: (context, snap) {
-                        final pic =
-                            snap.data?.data()?['profilePic'] as String? ??
-                            _photoController.text.trim();
-                        return Column(
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.red[200]!),
+                        ),
+                        child: Row(
                           children: [
-                            const SizedBox(height: 8),
-                            Center(
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  CircleAvatar(
-                                    radius: 56,
-                                    backgroundImage: (pic.isNotEmpty)
-                                        ? NetworkImage(pic)
-                                        : null,
-                                    child: (pic.isEmpty)
-                                        ? const Icon(Icons.person, size: 56)
-                                        : null,
-                                  ),
-                                  Positioned(
-                                    right: -6,
-                                    bottom: -40,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        shape: const CircleBorder(),
-                                        padding: const EdgeInsets.all(8),
-                                      ),
-                                      onPressed: _photoUploading
-                                          ? null
-                                          : _changeProfilePhoto,
-                                      child: _photoUploading
-                                          ? const SizedBox(
-                                              height: 16,
-                                              width: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.edit, size: 16),
-                                    ),
-                                  ),
-                                  if (pic.isNotEmpty)
-                                    Positioned(
-                                      left: -6,
-                                      bottom: -40,
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(
-                                          shape: const CircleBorder(),
-                                          padding: const EdgeInsets.all(8),
-                                        ),
-                                        onPressed: _photoUploading
-                                            ? null
-                                            : _removeProfilePhoto,
-                                        child: const Icon(
-                                          Icons.delete_outline,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                            Icon(
+                              Icons.error_outline,
+                              color: Colors.red[600],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: TextStyle(color: Colors.red[600]),
                               ),
                             ),
-                            const SizedBox(height: 16),
                           ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Name'),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'Name is required';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _photoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Profile picture URL (optional)',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _prefsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Preferences (comma separated)',
+                      const SizedBox(height: 16),
+                    ],
+                    // Profile Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _uploading ? null : _pickAndAnalyzeImage,
-                      icon: _uploading
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.add_a_photo_outlined),
-                      label: const Text('Add from Photo (AI)'),
-                    ),
-                    const SizedBox(height: 16),
-                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(_uid)
-                          .snapshots(),
-                      builder: (context, snap) {
-                        final prefs =
-                            ((snap.data?.data()?['preferences']
-                                        as List<dynamic>? ??
-                                    [])
-                                .cast<String>());
-                        if (prefs.isEmpty) return const SizedBox.shrink();
-                        return Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: prefs
-                              .map((p) => Chip(label: Text(p)))
-                              .toList(),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    // Removed duplicate Save button below history
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Swap History',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(_uid)
-                          .snapshots(),
-                      builder: (context, snap) {
-                        final historyIds =
-                            ((snap.data?.data()?['history'] as List<dynamic>? ??
-                                    [])
-                                .cast<String>());
-                        if (historyIds.isEmpty) {
-                          return const Text('No swaps yet');
-                        }
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: historyIds.length,
-                          itemBuilder: (context, index) {
-                            final id = historyIds[index];
-                            return StreamBuilder<
-                              DocumentSnapshot<Map<String, dynamic>>
-                            >(
-                              stream: FirebaseFirestore.instance
-                                  .collection('swaps')
-                                  .doc(id)
-                                  .snapshots(),
-                              builder: (context, s) {
-                                final d = s.data?.data();
-                                final title = d?['itemName'] ?? id;
-                                final status = d?['status'] ?? 'unknown';
-                                final imageUrl = d?['imageUrl'] as String?;
-                                return ListTile(
-                                  leading: imageUrl != null
-                                      ? CircleAvatar(
-                                          backgroundImage: NetworkImage(
-                                            imageUrl,
-                                          ),
-                                        )
-                                      : const CircleAvatar(
-                                          child: Icon(
-                                            Icons.shopping_bag_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Avatar - centered with edit and delete actions
+                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(_uid)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final pic =
+                                  snap.data?.data()?['profilePic'] as String? ??
+                                  _photoController.text.trim();
+                              return Column(
+                                children: [
+                                  const SizedBox(height: 8),
+                                  Center(
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 56,
+                                          backgroundColor: Colors.grey[100],
+                                          backgroundImage: (pic.isNotEmpty)
+                                              ? NetworkImage(pic)
+                                              : null,
+                                          child: (pic.isEmpty)
+                                              ? const Icon(
+                                                  Icons.person,
+                                                  size: 56,
+                                                )
+                                              : null,
+                                        ),
+                                        Positioned(
+                                          right: -6,
+                                          bottom: -40,
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              shape: const CircleBorder(),
+                                              padding: const EdgeInsets.all(8),
+                                            ),
+                                            onPressed: _photoUploading
+                                                ? null
+                                                : _changeProfilePhoto,
+                                            child: _photoUploading
+                                                ? const SizedBox(
+                                                    height: 16,
+                                                    width: 16,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.edit,
+                                                    size: 16,
+                                                  ),
                                           ),
                                         ),
-                                  title: Text(title.toString()),
-                                  subtitle: Text('Status: $status'),
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
+                                        if (pic.isNotEmpty)
+                                          Positioned(
+                                            left: -6,
+                                            bottom: -40,
+                                            child: OutlinedButton(
+                                              style: OutlinedButton.styleFrom(
+                                                shape: const CircleBorder(),
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                              ),
+                                              onPressed: _photoUploading
+                                                  ? null
+                                                  : _removeProfilePhoto,
+                                              child: const Icon(
+                                                Icons.delete_outline,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 48),
+                                ],
+                              );
+                            },
+                          ),
+                          // Name
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              labelText: 'Name',
+                              prefixIcon: const Icon(Icons.person_outline),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF667eea),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty)
+                                return 'Name is required';
+                              return null;
+                            },
+                          ),
+                          /*const SizedBox(height: 12),
+                          // Photo URL
+                          TextFormField(
+                            controller: _photoController,
+                            decoration: InputDecoration(
+                              labelText: 'Profile picture URL (optional)',
+                              prefixIcon: const Icon(Icons.link_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF667eea),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                          ),
+                          */
+                          const SizedBox(height: 12),
+                          // Preferences
+                          TextFormField(
+                            controller: _prefsController,
+                            decoration: InputDecoration(
+                              labelText: 'Preferences (comma separated)',
+                              prefixIcon: const Icon(Icons.style_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.grey[300]!,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF667eea),
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // AI Add from Photo
+                          ElevatedButton.icon(
+                            onPressed: _uploading ? null : _pickAndAnalyzeImage,
+                            icon: _uploading
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.add_a_photo_outlined),
+                            label: const Text('Add from Photo (AI)'),
+                          ),
+                          const SizedBox(height: 12),
+                          // Preference chips
+                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(_uid)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final prefs =
+                                  ((snap.data?.data()?['preferences']
+                                              as List<dynamic>? ??
+                                          [])
+                                      .cast<String>());
+                              if (prefs.isEmpty) return const SizedBox.shrink();
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: prefs
+                                    .map((p) => Chip(label: Text(p)))
+                                    .toList(),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          // Save Button
+                          Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _save,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _save,
-                      child: const Text('Save Changes'),
+                    const SizedBox(height: 24),
+                    // History Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Swap History',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(_uid)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final prefs =
+                                  ((snap.data?.data()?['preferences']
+                                              as List<dynamic>? ??
+                                          [])
+                                      .cast<String>());
+                              if (prefs.isEmpty) return const SizedBox.shrink();
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: prefs
+                                    .map((p) => Chip(label: Text(p)))
+                                    .toList(),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          // Removed duplicate Save button below history
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Swap History',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(_uid)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              final historyIds =
+                                  ((snap.data?.data()?['history']
+                                              as List<dynamic>? ??
+                                          [])
+                                      .cast<String>());
+                              if (historyIds.isEmpty) {
+                                return const Text('No swaps yet');
+                              }
+                              return ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: historyIds.length,
+                                itemBuilder: (context, index) {
+                                  final id = historyIds[index];
+                                  return StreamBuilder<
+                                    DocumentSnapshot<Map<String, dynamic>>
+                                  >(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('swaps')
+                                        .doc(id)
+                                        .snapshots(),
+                                    builder: (context, s) {
+                                      final d = s.data?.data();
+                                      final title = d?['itemName'] ?? id;
+                                      final status = d?['status'] ?? 'unknown';
+                                      final imageUrl =
+                                          d?['imageUrl'] as String?;
+                                      return Container(
+                                        margin: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.grey[200]!,
+                                          ),
+                                        ),
+                                        child: ListTile(
+                                          leading: imageUrl != null
+                                              ? CircleAvatar(
+                                                  backgroundImage: NetworkImage(
+                                                    imageUrl,
+                                                  ),
+                                                )
+                                              : const CircleAvatar(
+                                                  child: Icon(
+                                                    Icons.shopping_bag_outlined,
+                                                  ),
+                                                ),
+                                          title: Text(title.toString()),
+                                          subtitle: Text('Status: $status'),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
