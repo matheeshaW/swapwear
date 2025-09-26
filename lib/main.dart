@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'screens/add_listing_screen.dart';
+import 'screens/browsing_screen.dart';
+import 'theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,8 +17,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SwapWear',
-      theme: ThemeData(primarySwatch: Colors.green),
-      home: const HomePage(),
+      theme: AppTheme.lightTheme,
+      home: BrowsingScreen(userId: 'demouser123'),
     );
   }
 }
