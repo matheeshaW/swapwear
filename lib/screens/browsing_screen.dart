@@ -22,14 +22,6 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   String? selectedCondition;
   String sortBy = 'Newest';
 
-  final List<String> categories = [
-    'All',
-    'T-shirts',
-    'Jackets',
-    'Pants',
-    'Shoes',
-    'Accessories',
-  ];
   final List<String> sizes = ['All', 'S', 'M', 'L', 'XL'];
   final List<String> conditions = ['All', 'New', 'Like New', 'Used', 'Worn'];
   final List<String> sortOptions = ['Newest', 'Oldest'];
@@ -191,113 +183,143 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  // Category filter
-                  SizedBox(
-                    width: 130,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedCategory ?? 'All',
-                      items: categories
-                          .map(
-                            (cat) =>
-                                DropdownMenuItem(value: cat, child: Text(cat)),
-                          )
-                          .toList(),
-                      onChanged: (val) =>
-                          setState(() => selectedCategory = val),
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Size filter
-                  SizedBox(
-                    width: 90,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedSize ?? 'All',
-                      items: sizes
-                          .map(
-                            (sz) =>
-                                DropdownMenuItem(value: sz, child: Text(sz)),
-                          )
-                          .toList(),
-                      onChanged: (val) => setState(() => selectedSize = val),
-                      decoration: const InputDecoration(
-                        labelText: 'Size',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Condition filter
-                  SizedBox(
-                    width: 120,
-                    child: DropdownButtonFormField<String>(
-                      value: selectedCondition ?? 'All',
-                      items: conditions
-                          .map(
-                            (cond) => DropdownMenuItem(
-                              value: cond,
-                              child: Text(cond),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              color: AppColors.secondary,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 10),
+                      // Size filter
+                      SizedBox(
+                        width: 90,
+                        child: DropdownButtonFormField<String>(
+                          value: selectedSize ?? 'All',
+                          items: sizes
+                              .map(
+                                (sz) => DropdownMenuItem(
+                                  value: sz,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.straighten, size: 18),
+                                      SizedBox(width: 6),
+                                      Text(sz),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedSize = val),
+                          decoration: InputDecoration(
+                            labelText: 'Size',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (val) =>
-                          setState(() => selectedCondition = val),
-                      decoration: const InputDecoration(
-                        labelText: 'Condition',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Sort by
-                  SizedBox(
-                    width: 110,
-                    child: DropdownButtonFormField<String>(
-                      value: sortBy,
-                      items: sortOptions
-                          .map(
-                            (sort) => DropdownMenuItem(
-                              value: sort,
-                              child: Text(sort),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
                             ),
-                          )
-                          .toList(),
-                      onChanged: (val) => setState(() => sortBy = val!),
-                      decoration: const InputDecoration(
-                        labelText: 'Sort',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 8,
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      // Condition filter
+                      SizedBox(
+                        width: 120,
+                        child: DropdownButtonFormField<String>(
+                          value: selectedCondition ?? 'All',
+                          items: conditions
+                              .map(
+                                (cond) => DropdownMenuItem(
+                                  value: cond,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle_outline,
+                                        size: 18,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(cond),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => selectedCondition = val),
+                          decoration: InputDecoration(
+                            labelText: 'Condition',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Sort by
+                      SizedBox(
+                        width: 120,
+                        child: DropdownButtonFormField<String>(
+                          value: sortBy,
+                          items: sortOptions
+                              .map(
+                                (sort) => DropdownMenuItem(
+                                  value: sort,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        sort == 'Newest'
+                                            ? Icons.arrow_downward
+                                            : Icons.arrow_upward,
+                                        size: 18,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(sort),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) => setState(() => sortBy = val!),
+                          decoration: InputDecoration(
+                            labelText: 'Sort',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
