@@ -551,38 +551,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Swap History',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(_uid)
-                                .snapshots(),
-                            builder: (context, snap) {
-                              final prefs =
-                                  ((snap.data?.data()?['preferences']
-                                              as List<dynamic>? ??
-                                          [])
-                                      .cast<String>());
-                              if (prefs.isEmpty) return const SizedBox.shrink();
-                              return Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: prefs
-                                    .map((p) => Chip(label: Text(p)))
-                                    .toList(),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          // Removed duplicate Save button below history
-                          const SizedBox(height: 24),
+                          // Remove duplicated preferences chips here
+                          // const Text(
+                          //   'Swap History',
+                          //   style: TextStyle(
+                          //     fontSize: 18,
+                          //     fontWeight: FontWeight.w700,
+                          //   ),
+                          // ),
+                          // const SizedBox(height: 8),
+                          // StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                          //   stream: FirebaseFirestore.instance
+                          //       .collection('users')
+                          //       .doc(_uid)
+                          //       .snapshots(),
+                          //   builder: (context, snap) {
+                          //     final prefs =
+                          //         ((snap.data?.data()?['preferences']
+                          //                     as List<dynamic>? ??
+                          //                 [])
+                          //             .cast<String>());
+                          //     if (prefs.isEmpty) return const SizedBox.shrink();
+                          //     return Wrap(
+                          //       spacing: 8,
+                          //       runSpacing: 8,
+                          //       children: prefs
+                          //           .map((p) => Chip(label: Text(p)))
+                          //           .toList(),
+                          //     );
+                          //   },
+                          // ),
                           const Text(
                             'Swap History',
                             style: TextStyle(
