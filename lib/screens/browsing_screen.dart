@@ -36,9 +36,6 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
 
   Query getListingsQuery() {
     Query query = FirebaseFirestore.instance.collection('listings');
-    if (selectedCategory != null && selectedCategory != 'All') {
-      query = query.where('category', isEqualTo: selectedCategory);
-    }
     if (selectedSize != null && selectedSize != 'All') {
       query = query.where('size', isEqualTo: selectedSize);
     }
@@ -182,8 +179,35 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       ),
       body: Column(
         children: [
+          // Search bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: SizedBox(
+              height: 44,
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search apparel... ',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 0,
+                    horizontal: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (val) {
+                  // Optionally implement search logic
+                },
+              ),
+            ),
+          ),
+          // Modern filter & sort bar (no category, all options visible, wrap if needed)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
@@ -192,137 +216,140 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
               color: AppColors.secondary,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
+                  horizontal: 10,
                   vertical: 10,
                 ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 10),
-                      // Size filter
-                      SizedBox(
-                        width: 90,
-                        child: DropdownButtonFormField<String>(
-                          value: selectedSize ?? 'All',
-                          items: sizes
-                              .map(
-                                (sz) => DropdownMenuItem(
-                                  value: sz,
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.straighten, size: 18),
-                                      SizedBox(width: 6),
-                                      Text(sz),
-                                    ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        // Size filter as ChoiceChips
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Size:',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 6),
+                            ...['All', 'S', 'M', 'L', 'XL'].map(
+                              (sz) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: ChoiceChip(
+                                  label: Text(sz),
+                                  selected: (selectedSize ?? 'All') == sz,
+                                  selectedColor: AppColors.primary,
+                                  backgroundColor: Colors.white,
+                                  labelStyle: TextStyle(
+                                    color: (selectedSize ?? 'All') == sz
+                                        ? Colors.white
+                                        : AppColors.accent,
+                                  ),
+                                  onSelected: (_) =>
+                                      setState(() => selectedSize = sz),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                              )
-                              .toList(),
-                          onChanged: (val) =>
-                              setState(() => selectedSize = val),
-                          decoration: InputDecoration(
-                            labelText: 'Size',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
-                          ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Condition filter
-                      SizedBox(
-                        width: 120,
-                        child: DropdownButtonFormField<String>(
-                          value: selectedCondition ?? 'All',
-                          items: conditions
-                              .map(
-                                (cond) => DropdownMenuItem(
-                                  value: cond,
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle_outline,
-                                        size: 18,
+                        // Condition filter as ChoiceChips
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Condition:',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  ...[
+                                    'All',
+                                    'New',
+                                    'Like New',
+                                    'Used',
+                                    'Worn',
+                                  ].map(
+                                    (cond) => ChoiceChip(
+                                      label: Text(cond),
+                                      selected:
+                                          (selectedCondition ?? 'All') == cond,
+                                      selectedColor: AppColors.primary,
+                                      backgroundColor: Colors.white,
+                                      labelStyle: TextStyle(
+                                        color:
+                                            (selectedCondition ?? 'All') == cond
+                                            ? Colors.white
+                                            : AppColors.accent,
                                       ),
-                                      SizedBox(width: 6),
-                                      Text(cond),
-                                    ],
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) =>
-                              setState(() => selectedCondition = val),
-                          decoration: InputDecoration(
-                            labelText: 'Condition',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Sort by
-                      SizedBox(
-                        width: 120,
-                        child: DropdownButtonFormField<String>(
-                          value: sortBy,
-                          items: sortOptions
-                              .map(
-                                (sort) => DropdownMenuItem(
-                                  value: sort,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        sort == 'Newest'
-                                            ? Icons.arrow_downward
-                                            : Icons.arrow_upward,
-                                        size: 18,
+                                      onSelected: (_) => setState(
+                                        () => selectedCondition = cond,
                                       ),
-                                      SizedBox(width: 6),
-                                      Text(sort),
-                                    ],
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) => setState(() => sortBy = val!),
-                          decoration: InputDecoration(
-                            labelText: 'Sort',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
+                                ],
+                              ),
                             ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
-                          ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
+                        // Sort by as pill toggle
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Sort:',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 6),
+                            ToggleButtons(
+                              borderRadius: BorderRadius.circular(18),
+                              isSelected: [
+                                sortBy == 'Newest',
+                                sortBy == 'Oldest',
+                              ],
+                              selectedColor: Colors.white,
+                              fillColor: AppColors.primary,
+                              color: AppColors.accent,
+                              children: const [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text('Newest'),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text('Oldest'),
+                                ),
+                              ],
+                              onPressed: (idx) {
+                                setState(
+                                  () => sortBy = idx == 0 ? 'Newest' : 'Oldest',
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+          // Listings feed
           Expanded(
             child: StreamBuilder<Set<String>>(
               stream: wishlistStream,
@@ -331,6 +358,15 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                 return StreamBuilder<QuerySnapshot>(
                   stream: getListingsQuery().snapshots(),
                   builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text(
+                          'Error loading listings.\n${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
@@ -338,135 +374,153 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                       return const Center(child: Text('No listings found.'));
                     }
                     final docs = snapshot.data!.docs;
-                    return Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 0.7,
-                            ),
-                        itemCount: docs.length,
-                        itemBuilder: (context, idx) {
-                          final data = docs[idx].data() as Map<String, dynamic>;
-                          final listingId = docs[idx].id;
-                          return GestureDetector(
-                            onTap: () => _showDetailModal(data),
-                            child: Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              elevation: 4,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(18),
-                                    ),
-                                    child: Image.network(
-                                      data['imageUrl'],
-                                      height: 140,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                data['title'] ?? '',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyLarge
-                                                    ?.copyWith(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            GestureDetector(
-                                              onTap: () =>
-                                                  _toggleWishlist(listingId),
-                                              child: Icon(
-                                                wishlistSet.contains(listingId)
-                                                    ? Icons.favorite
-                                                    : Icons.favorite_border,
-                                                color:
-                                                    wishlistSet.contains(
-                                                      listingId,
-                                                    )
-                                                    ? AppColors.primary
-                                                    : Colors.grey,
-                                                size: 24,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.primary
-                                                    .withOpacity(0.12),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                data['size'] ?? '',
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.primary
-                                                    .withOpacity(0.12),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                data['condition'] ?? '',
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                    return ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
+                      itemCount: docs.length,
+                      separatorBuilder: (context, idx) =>
+                          const SizedBox(height: 14),
+                      itemBuilder: (context, idx) {
+                        final data = docs[idx].data() as Map<String, dynamic>;
+                        final listingId = docs[idx].id;
+                        return Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    data['imageUrl'],
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              data['title'] ?? '',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          GestureDetector(
+                                            onTap: () =>
+                                                _toggleWishlist(listingId),
+                                            child: Icon(
+                                              wishlistSet.contains(listingId)
+                                                  ? Icons.favorite
+                                                  : Icons.favorite_border,
+                                              color:
+                                                  wishlistSet.contains(
+                                                    listingId,
+                                                  )
+                                                  ? AppColors.primary
+                                                  : Colors.grey,
+                                              size: 22,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary
+                                                  .withOpacity(0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              data['size'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary
+                                                  .withOpacity(0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              data['condition'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: () =>
+                                                _showDetailModal(data),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppColors.primary,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 18,
+                                                    vertical: 8,
+                                                  ),
+                                              textStyle: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            child: const Text('View Details'),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -474,6 +528,48 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
             ),
           ),
         ],
+      ),
+      // Modern bottom navigation bar
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite_border),
+            label: 'Wishlist',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.add_box_outlined),
+            label: 'Add',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
+        ],
+        currentIndex: 0, // You can make this dynamic if you add navigation
+        onTap: (idx) {
+          if (idx == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => WishlistScreen(userId: widget.userId),
+              ),
+            );
+          } else if (idx == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddListingScreen(userId: widget.userId),
+              ),
+            );
+          }
+          // Add navigation for other tabs as needed
+        },
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
