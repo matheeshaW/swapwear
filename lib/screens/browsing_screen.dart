@@ -6,6 +6,7 @@ import 'wishlist_screen.dart';
 import 'profile_screen.dart';
 import 'admin_dashboard.dart';
 import '../services/admin_service.dart';
+import 'listing_details_screen.dart';
 
 class BrowsingScreen extends StatefulWidget {
   final String userId;
@@ -492,8 +493,19 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                     Row(
                                       children: [
                                         ElevatedButton(
-                                          onPressed: () =>
-                                              _showDetailModal(data),
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    ListingDetailsScreen(
+                                                      data: data,
+                                                      listingId: listingId,
+                                                      userId: widget.userId,
+                                                    ),
+                                              ),
+                                            );
+                                          },
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: AppColors.primary,
                                             foregroundColor: Colors.white,
