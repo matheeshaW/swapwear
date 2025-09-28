@@ -101,4 +101,6 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "swapwearicon.png"
+  image_path: "appIcon.png" # fallback
+
+  adaptive_icon_foreground: "appIcon.png"
