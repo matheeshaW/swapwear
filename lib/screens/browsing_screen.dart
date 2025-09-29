@@ -463,12 +463,13 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                       horizontal: 12,
                       vertical: 8,
                     ),
-                    itemCount: docs.length,
+                    itemCount: sortedDocs.length,
                     separatorBuilder: (context, idx) =>
                         const SizedBox(height: 14),
                     itemBuilder: (context, idx) {
-                      final data = docs[idx].data() as Map<String, dynamic>;
-                      final listingId = docs[idx].id;
+                      final data =
+                          sortedDocs[idx].data() as Map<String, dynamic>;
+                      final listingId = sortedDocs[idx].id;
                       return Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(
