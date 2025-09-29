@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/swap_service.dart';
+import 'chat_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -650,6 +652,119 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           title: Text(title.toString()),
                                           subtitle: Text('Status: $status'),
                                         ),
+                                      );
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // My Swaps Section
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'My Swaps',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          StreamBuilder<List<dynamic>>(
+                            stream: SwapService().getUserSwaps(_uid),
+                            builder: (context, snap) {
+                              if (snap.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              final swaps = snap.data ?? [];
+                              if (swaps.isEmpty) {
+                                return const Text('No swaps yet');
+                              }
+                              return ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: swaps.length,
+                                itemBuilder: (context, idx) {
+                                  final swap = swaps[idx];
+                                  final offeredId =
+                                      swap.listingOfferedId ??
+                                      swap['listingOfferedId'];
+                                  final requestedId =
+                                      swap.listingRequestedId ??
+                                      swap['listingRequestedId'];
+                                  final status =
+                                      swap.status ??
+                                      swap['status'] ??
+                                      'pending';
+                                  final chatId =
+                                      swap.chatId ??
+                                      swap['chatId'] ??
+                                      swap.id ??
+                                      swap['id'];
+                                  return FutureBuilder<List<String>>(
+                                    future: () async {
+                                      final db = FirebaseFirestore.instance;
+                                      final offeredSnap = await db
+                                          .collection('listings')
+                                          .doc(offeredId)
+                                          .get();
+                                      final requestedSnap = await db
+                                          .collection('listings')
+                                          .doc(requestedId)
+                                          .get();
+                                      final offeredTitle =
+                                          offeredSnap.data()?['title'] ??
+                                          'Unknown';
+                                      final requestedTitle =
+                                          requestedSnap.data()?['title'] ??
+                                          'Unknown';
+                                      return [
+                                        offeredTitle,
+                                        requestedTitle,
+                                      ].cast<String>();
+                                    }(),
+                                    builder: (context, listingSnap) {
+                                      final titles =
+                                          listingSnap.data ?? ['...', '...'];
+                                      return ListTile(
+                                        leading: const Icon(Icons.swap_horiz),
+                                        title: Text(
+                                          '${titles[0]}  ↔  ${titles[1]}',
+                                        ),
+                                        subtitle: Text('Status: $status'),
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => ChatScreen(
+                                                chatId: chatId,
+                                                currentUserId: _uid,
+                                                swapId: swap.id ?? swap['id'],
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       );
                                     },
                                   );
