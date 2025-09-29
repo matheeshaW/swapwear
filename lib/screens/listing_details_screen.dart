@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/swap_service.dart';
 
 class ListingDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -15,6 +18,43 @@ class ListingDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("CurrentUser:  [32m");
+    print(FirebaseAuth.instance.currentUser?.uid);
+    print("Listing Owner: $userId");
+
+    Future<List<Map<String, dynamic>>> fetchUserListings(String userId) async {
+      final snap = await FirebaseFirestore.instance
+          .collection('listings')
+          .where('userId', isEqualTo: userId)
+          .get();
+      return snap.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    }
+
+    Future<String?> showOfferedListingPicker(
+      BuildContext context,
+      List<Map<String, dynamic>> userListings,
+    ) async {
+      return showDialog<String>(
+        context: context,
+        builder: (context) {
+          return SimpleDialog(
+            title: const Text('Select Your Listing to Offer'),
+            children: userListings.map((listing) {
+              return SimpleDialogOption(
+                onPressed: () =>
+                    Navigator.pop(context, listing['id'] as String),
+                child: Text(listing['title'] ?? 'Untitled'),
+              );
+            }).toList(),
+          );
+        },
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Listing Details')),
       body: SingleChildScrollView(
@@ -82,7 +122,54 @@ class ListingDetailsScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: null,
+                onPressed: () async {
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  if (currentUser == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('You must be logged in.')),
+                    );
+                    return;
+                  }
+                  if (userId == currentUser.uid) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('You cannot swap your own listing.'),
+                      ),
+                    );
+                    return;
+                  }
+                  final userListings = await fetchUserListings(currentUser.uid);
+                  if (userListings.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('You have no listings to offer!'),
+                      ),
+                    );
+                    return;
+                  }
+                  final offeredId = await showOfferedListingPicker(
+                    context,
+                    userListings,
+                  );
+                  if (offeredId == null) return; // User cancelled
+                  try {
+                    await SwapService().createSwapRequest(
+                      fromUserId: currentUser.uid,
+                      toUserId: userId,
+                      listingOfferedId: offeredId,
+                      listingRequestedId: listingId,
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Swap request sent!')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to send swap request: $e'),
+                      ),
+                    );
+                  }
+                },
                 child: const Text('Request Swap'),
               ),
             ),
