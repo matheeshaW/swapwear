@@ -32,6 +32,14 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
 
   final List<String> sizes = ['All', 'S', 'M', 'L', 'XL'];
   final List<String> conditions = ['All', 'New', 'Like New', 'Used', 'Worn'];
+  final List<String> categories = [
+    'All',
+    'Tops',
+    'Bottoms',
+    'Outerwear',
+    'Footwear',
+    'Accessories',
+  ];
   final List<String> sortOptions = ['Newest', 'Oldest'];
 
   @override
@@ -89,13 +97,25 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
 
   Query getListingsQuery() {
     Query query = FirebaseFirestore.instance.collection('listings');
-    if (selectedSize != null && selectedSize != 'All') {
+    final hasCategory = selectedCategory != null && selectedCategory != 'All';
+    final hasSize = selectedSize != null && selectedSize != 'All';
+    final hasCondition =
+        selectedCondition != null && selectedCondition != 'All';
+
+    if (hasCategory) {
+      query = query.where('category', isEqualTo: selectedCategory);
+    }
+    if (hasSize) {
       query = query.where('size', isEqualTo: selectedSize);
     }
-    if (selectedCondition != null && selectedCondition != 'All') {
+    if (hasCondition) {
       query = query.where('condition', isEqualTo: selectedCondition);
     }
-    query = query.orderBy('timestamp', descending: sortBy == 'Newest');
+
+    // Only orderBy when no filters (avoids composite index requirements)
+    if (!hasCategory && !hasSize && !hasCondition) {
+      query = query.orderBy('timestamp', descending: sortBy == 'Newest');
+    }
     return query;
   }
 
@@ -163,6 +183,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
             if (data['description'] != null)
               Text(
@@ -310,6 +331,45 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                           ),
                         ],
                       ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Category:',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: categories
+                                  .map(
+                                    (cat) => ChoiceChip(
+                                      label: Text(cat),
+                                      selected:
+                                          (selectedCategory ?? 'All') == cat,
+                                      selectedColor: AppColors.primary,
+                                      backgroundColor: Colors.white,
+                                      labelStyle: TextStyle(
+                                        color:
+                                            (selectedCategory ?? 'All') == cat
+                                            ? Colors.white
+                                            : AppColors.accent,
+                                      ),
+                                      onSelected: (_) => setState(
+                                        () => selectedCategory = cat,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                        ],
+                      ),
                       // Sort by as pill toggle
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -378,6 +438,26 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                     return const Center(child: Text('No listings found.'));
                   }
                   final docs = snapshot.data!.docs;
+
+                  // Client-side sort when filters are active
+                  final hasFilters =
+                      (selectedCategory != null && selectedCategory != 'All') ||
+                      (selectedSize != null && selectedSize != 'All') ||
+                      (selectedCondition != null && selectedCondition != 'All');
+
+                  final sortedDocs = hasFilters
+                      ? (docs.toList()..sort((a, b) {
+                          final ta = (a['timestamp'] as Timestamp?);
+                          final tb = (b['timestamp'] as Timestamp?);
+                          final da = ta?.toDate();
+                          final db = tb?.toDate();
+                          if (da == null && db == null) return 0;
+                          if (da == null) return 1;
+                          if (db == null) return -1;
+                          final cmp = da.compareTo(db);
+                          return (sortBy == 'Newest') ? -cmp : cmp;
+                        }))
+                      : docs;
                   return ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -487,6 +567,59 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                             ),
                                           ),
                                         ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        if ((data['category'] ?? '')
+                                                is String &&
+                                            (data['category'] ?? '').isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary
+                                                  .withOpacity(0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              data['category'],
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ...((data['tags'] is List)
+                                                ? (data['tags'] as List)
+                                                      .cast<dynamic>()
+                                                : <dynamic>[])
+                                            .take(4) // limit chips in list row
+                                            .map(
+                                              (t) => Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade200,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  t.toString(),
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                                       ],
                                     ),
                                     const SizedBox(height: 8),

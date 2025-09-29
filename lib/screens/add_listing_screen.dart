@@ -14,6 +14,16 @@ class AddListingScreen extends StatefulWidget {
 
 class _AddListingScreenState extends State<AddListingScreen> {
   final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _tagsController = TextEditingController();
+  String _selectedCategory = 'Tops';
+  final List<String> _categories = [
+    'Tops',
+    'Bottoms',
+    'Outerwear',
+    'Footwear',
+    'Accessories',
+  ];
   String _selectedSize = 'M';
   String _selectedCondition = 'Like New';
   XFile? _imageFile;
@@ -39,6 +49,14 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return;
     }
 
+    if (_selectedCategory.isEmpty ||
+        _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill description and category.')),
+      );
+      return;
+    }
+
     setState(() => _isUploading = true);
 
     try {
@@ -57,6 +75,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
         'size': _selectedSize,
         'condition': _selectedCondition,
         'imageUrl': imageUrl,
+        'description': _descriptionController.text.trim(),
+        'category': _selectedCategory,
+        'tags': _tagsController.text
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList(),
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -65,6 +90,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
         _isUploading = false;
         _titleController.clear();
         _imageFile = null;
+        _descriptionController.clear();
+        _tagsController.clear();
+        _selectedCategory = 'Tops';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -115,6 +143,34 @@ class _AddListingScreenState extends State<AddListingScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  TextField(
+                    controller: _descriptionController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Description',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.notes),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategory,
+                    items: _categories
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
+                    onChanged: (val) =>
+                        setState(() => _selectedCategory = val!),
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.category_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   // Size dropdown
                   DropdownButtonFormField<String>(
                     value: _selectedSize,
@@ -154,6 +210,19 @@ class _AddListingScreenState extends State<AddListingScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  // Tags(comma separated)
+                  TextField(
+                    controller: _tagsController,
+                    decoration: InputDecoration(
+                      labelText: 'Tags (comma-separated)',
+                      hintText: 'e.g. summer, casual, vintage',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.tag),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   // Image preview
                   Center(
                     child: GestureDetector(

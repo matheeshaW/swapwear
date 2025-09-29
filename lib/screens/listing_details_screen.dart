@@ -50,6 +50,28 @@ class ListingDetailsScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if ((data['category'] ?? '') is String &&
+                    (data['category'] ?? '').isNotEmpty)
+                  Chip(
+                    label: Text('Category: ${data['category']}'),
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                  ),
+                ...((data['tags'] is List)
+                        ? (data['tags'] as List).cast<dynamic>()
+                        : <dynamic>[])
+                    .map(
+                      (t) => Chip(
+                        label: Text(t.toString()),
+                        backgroundColor: Colors.grey.shade200,
+                      ),
+                    ),
+              ],
+            ),
             const SizedBox(height: 16),
             if (data['description'] != null)
               Text(
