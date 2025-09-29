@@ -36,11 +36,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _error = null;
     });
     try {
-      await _authService.signUpWithEmail(
+      final credential = await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      if (mounted) Navigator.of(context).pop();
+      final userId = credential.user?.uid ?? '';
+      if (mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/browse',
+          arguments: {'userId': userId},
+        );
+      }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {

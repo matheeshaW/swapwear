@@ -6,9 +6,11 @@ import 'screens/signup_screen.dart';
 import 'services/profile_service.dart';
 import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard.dart';
-import 'screens/home_scaffold.dart';
+import 'screens/add_listing_screen.dart';
+import 'screens/browsing_screen.dart';
+import 'theme/theme.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   runApp(const MyApp());
@@ -21,14 +23,24 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SwapWear',
-      theme: ThemeData(primarySwatch: Colors.green),
+
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignUpScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/admin': (context) => const AdminDashboard(),
       },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/browse') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => BrowsingScreen(userId: args['userId']),
+          );
+        }
+        return null; // fallback to default
+      },
       home: const AuthGate(),
+      theme: AppTheme.lightTheme,
     );
   }
 }
@@ -54,7 +66,7 @@ class AuthGate extends StatelessWidget {
 
         // Ensure Firestore profile exists for authenticated users
         ProfileService().ensureUserProfile(user: user);
-        return const HomeScaffold();
+        return BrowsingScreen(userId: user.uid);
       },
     );
   }
