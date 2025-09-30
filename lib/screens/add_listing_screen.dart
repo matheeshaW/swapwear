@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'browsing_screen.dart';
 
 // data model to pass between steps
 class ListingData {
@@ -42,6 +43,87 @@ class ListingData {
       condition: condition ?? this.condition,
       tags: tags ?? this.tags,
       imageFile: imageFile ?? this.imageFile,
+    );
+  }
+}
+
+class StepProgressBar extends StatelessWidget {
+  final double progress; // 0..1
+  final double horizontalInset; // space from left & right
+  const StepProgressBar({
+    super.key,
+    required this.progress,
+    this.horizontalInset = 12,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalW = constraints.maxWidth - (horizontalInset * 2);
+        final knobR = 8.0;
+        final knobD = knobR * 2;
+        final clamped = progress.clamp(0.0, 1.0);
+
+        final travel = (totalW - knobD).clamp(0.0, totalW);
+        final knobLeft = travel * clamped;
+
+        final fillW = knobLeft + knobR;
+
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalInset),
+          child: SizedBox(
+            height: 16,
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              alignment: Alignment.centerLeft,
+              children: [
+                // Track
+                Container(
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                // Fill
+                Positioned(
+                  left: 0,
+                  child: Container(
+                    width: fillW,
+                    height: 6,
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                // Knob
+                Positioned(
+                  left: fillW - knobR,
+                  child: Container(
+                    width: knobR * 2,
+                    height: knobR * 2,
+                    decoration: BoxDecoration(
+                      color: clamped >= 1 ? Colors.blue : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -122,7 +204,13 @@ class _AddListingStep1ScreenState extends State<AddListingStep1Screen> {
                   Row(
                     children: [
                       IconButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                BrowsingScreen(userId: widget.userId),
+                          ),
+                        ),
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
                       ),
                       Expanded(
@@ -146,23 +234,13 @@ class _AddListingStep1ScreenState extends State<AddListingStep1Screen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // progress bar
-                  Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: 0.5,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+                  const SizedBox(height: 8),
+                  StepProgressBar(progress: 0.5),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Item Details',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.white70,
                     ),
                   ),
                 ],
@@ -459,8 +537,13 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
         const SnackBar(content: Text('Listing uploaded successfully!')),
       );
 
-      // navigate back to previous screen
-      Navigator.popUntil(context, (route) => route.isFirst);
+      // navigate to Browse listings
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => BrowsingScreen(userId: widget.userId),
+        ),
+        (route) => false,
+      );
     } catch (e) {
       setState(() => _isUploading = false);
       ScaffoldMessenger.of(
@@ -486,7 +569,14 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
                   Row(
                     children: [
                       IconButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          final w = widget;
+                          if (w is _AddListingStep2Proxy) {
+                            (w as _AddListingStep2Proxy).onBackToStep1();
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
                       ),
                       Expanded(
@@ -510,30 +600,13 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
+                  StepProgressBar(progress: 1.0),
+                  const SizedBox(height: 6),
                   Text(
                     'Media & Tags',
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.white70,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // progress bar
-                  Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: 1.0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -761,13 +834,119 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
   }
 }
 
-// main AddListingScreen that routes to step 1
-class AddListingScreen extends StatelessWidget {
+extension _Step1WithNext on AddListingStep1Screen {
+  Widget buildWithNext(void Function(ListingData) onNext) {
+    return _AddListingStep1Proxy(userId: userId, onNext: onNext);
+  }
+}
+
+class _AddListingStep1Proxy extends AddListingStep1Screen {
+  final void Function(ListingData) onNext;
+  const _AddListingStep1Proxy({
+    required super.userId,
+    required this.onNext,
+    super.key,
+  });
+
+  @override
+  State<AddListingStep1Screen> createState() => _AddListingStep1ProxyState();
+}
+
+class _AddListingStep1ProxyState extends _AddListingStep1ScreenState {
+  void _forward(ListingData data) =>
+      (widget as _AddListingStep1Proxy).onNext(data);
+
+  @override
+  void _goToStep2() {
+    if (_titleController.text.isEmpty ||
+        _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in title and description')),
+      );
+      return;
+    }
+    final data = ListingData(
+      title: _titleController.text,
+      description: _descriptionController.text.trim(),
+      category: _selectedCategory,
+      size: _selectedSize,
+      condition: _selectedCondition,
+      tags: [],
+    );
+    _forward(data);
+  }
+}
+
+extension _Step2WithBack on AddListingStep2Screen {
+  Widget buildWithBack(VoidCallback onBackToStep1) {
+    return _AddListingStep2Proxy(
+      userId: userId,
+      listingData: listingData,
+      onBackToStep1: onBackToStep1,
+    );
+  }
+}
+
+class _AddListingStep2Proxy extends AddListingStep2Screen {
+  final VoidCallback onBackToStep1;
+  const _AddListingStep2Proxy({
+    required super.userId,
+    required super.listingData,
+    required this.onBackToStep1,
+    super.key,
+  });
+
+  @override
+  State<AddListingStep2Screen> createState() => _AddListingStep2ProxyState();
+}
+
+class _AddListingStep2ProxyState extends _AddListingStep2ScreenState {
+  @override
+  Widget build(BuildContext context) {
+    return super.build(context);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+}
+
+// main AddListingScreen that hosts both steps
+class AddListingScreen extends StatefulWidget {
   final String userId;
   const AddListingScreen({super.key, required this.userId});
 
   @override
+  State<AddListingScreen> createState() => _AddListingScreenState();
+}
+
+class _AddListingScreenState extends State<AddListingScreen> {
+  int _step = 1;
+  ListingData? _listingDraft;
+
+  void _goToStep2(ListingData data) {
+    setState(() {
+      _listingDraft = data;
+      _step = 2;
+    });
+  }
+
+  void _backToStep1() {
+    setState(() => _step = 1);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AddListingStep1Screen(userId: userId);
+    if (_step == 1) {
+      // Inject a callback to move to step 2
+      return AddListingStep1Screen(
+        userId: widget.userId,
+      ).buildWithNext(_goToStep2);
+    }
+    return AddListingStep2Screen(
+      userId: widget.userId,
+      listingData: _listingDraft!,
+    ).buildWithBack(_backToStep1);
   }
 }
