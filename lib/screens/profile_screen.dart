@@ -7,6 +7,7 @@ import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/swap_service.dart';
 import 'chat_screen.dart';
+import '../models/swap_model.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -536,53 +537,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // History Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
+                    // Swaps Archive (Option C)
+                    DefaultTabController(
+                      length: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Remove duplicated preferences chips here
-                          // const Text(
-                          //   'Swap History',
-                          //   style: TextStyle(
-                          //     fontSize: 18,
-                          //     fontWeight: FontWeight.w700,
-                          //   ),
-                          // ),
-                          // const SizedBox(height: 8),
-                          // StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                          //   stream: FirebaseFirestore.instance
-                          //       .collection('users')
-                          //       .doc(_uid)
-                          //       .snapshots(),
-                          //   builder: (context, snap) {
-                          //     final prefs =
-                          //         ((snap.data?.data()?['preferences']
-                          //                     as List<dynamic>? ??
-                          //                 [])
-                          //             .cast<String>());
-                          //     if (prefs.isEmpty) return const SizedBox.shrink();
-                          //     return Wrap(
-                          //       spacing: 8,
-                          //       runSpacing: 8,
-                          //       children: prefs
-                          //           .map((p) => Chip(label: Text(p)))
-                          //           .toList(),
-                          //     );
-                          //   },
-                          // ),
                           const Text(
                             'Swap History',
                             style: TextStyle(
@@ -591,73 +551,153 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(_uid)
-                                .snapshots(),
-                            builder: (context, snap) {
-                              final historyIds =
-                                  ((snap.data?.data()?['history']
-                                              as List<dynamic>? ??
-                                          [])
-                                      .cast<String>());
-                              if (historyIds.isEmpty) {
-                                return const Text('No swaps yet');
-                              }
-                              return ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: historyIds.length,
-                                itemBuilder: (context, index) {
-                                  final id = historyIds[index];
-                                  return StreamBuilder<
-                                    DocumentSnapshot<Map<String, dynamic>>
-                                  >(
-                                    stream: FirebaseFirestore.instance
-                                        .collection('swaps')
-                                        .doc(id)
-                                        .snapshots(),
-                                    builder: (context, s) {
-                                      final d = s.data?.data();
-                                      final title = d?['itemName'] ?? id;
-                                      final status = d?['status'] ?? 'unknown';
-                                      final imageUrl =
-                                          d?['imageUrl'] as String?;
-                                      return Container(
-                                        margin: const EdgeInsets.symmetric(
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.grey[200]!,
-                                          ),
-                                        ),
-                                        child: ListTile(
-                                          leading: imageUrl != null
-                                              ? CircleAvatar(
-                                                  backgroundImage: NetworkImage(
-                                                    imageUrl,
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const TabBar(
+                              labelColor: Color(0xFF667eea),
+                              unselectedLabelColor: Colors.black54,
+                              indicatorColor: Color(0xFF667eea),
+                              tabs: [
+                                Tab(text: 'Active'),
+                                Tab(text: 'Past'),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            height: 320, // Adjust as needed
+                            child: StreamBuilder<List<SwapModel>>(
+                              stream: SwapService().getUserSwaps(_uid),
+                              builder: (context, snap) {
+                                if (snap.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+                                if (snap.hasError) {
+                                  return Center(
+                                    child: Text('Error: ${snap.error}'),
+                                  );
+                                }
+                                final swaps = snap.data ?? [];
+                                final active = swaps
+                                    .where(
+                                      (s) =>
+                                          s.status == 'pending' ||
+                                          s.status == 'accepted',
+                                    )
+                                    .toList();
+                                final past = swaps
+                                    .where(
+                                      (s) =>
+                                          s.status == 'rejected' ||
+                                          s.status == 'completed',
+                                    )
+                                    .toList();
+                                Widget buildSwapList(List<SwapModel> list) {
+                                  if (list.isEmpty) {
+                                    return const Center(
+                                      child: Text('No swaps'),
+                                    );
+                                  }
+                                  return ListView.builder(
+                                    itemCount: list.length,
+                                    itemBuilder: (context, idx) {
+                                      final swap = list[idx];
+                                      return FutureBuilder<List<String>>(
+                                        future: () async {
+                                          final db = FirebaseFirestore.instance;
+                                          final offeredSnap = await db
+                                              .collection('listings')
+                                              .doc(swap.listingOfferedId)
+                                              .get();
+                                          final requestedSnap = await db
+                                              .collection('listings')
+                                              .doc(swap.listingRequestedId)
+                                              .get();
+                                          final offeredTitle =
+                                              offeredSnap
+                                                  .data()?['title']
+                                                  ?.toString() ??
+                                              'Unknown';
+                                          final requestedTitle =
+                                              requestedSnap
+                                                  .data()?['title']
+                                                  ?.toString() ??
+                                              'Unknown';
+                                          return <String>[
+                                            offeredTitle,
+                                            requestedTitle,
+                                          ];
+                                        }(),
+                                        builder: (context, listingSnap) {
+                                          final titles =
+                                              listingSnap.data ??
+                                              ['...', '...'];
+                                          return Card(
+                                            margin: const EdgeInsets.symmetric(
+                                              vertical: 6,
+                                            ),
+                                            child: ListTile(
+                                              leading: const Icon(
+                                                Icons.swap_horiz,
+                                              ),
+                                              title: Text(
+                                                '${titles[0]}  ↔  ${titles[1]}',
+                                              ),
+                                              subtitle: Text(
+                                                'Status: ${swap.status}',
+                                              ),
+                                              trailing: ElevatedButton(
+                                                onPressed: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          ChatScreen(
+                                                            chatId: swap.chatId,
+                                                            currentUserId: _uid,
+                                                            swapId:
+                                                                swap.id ?? '',
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                                child: const Text('Open Chat'),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(
+                                                    0xFF667eea,
                                                   ),
-                                                )
-                                              : const CircleAvatar(
-                                                  child: Icon(
-                                                    Icons.shopping_bag_outlined,
+                                                  foregroundColor: Colors.white,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                  textStyle: const TextStyle(
+                                                    fontSize: 13,
                                                   ),
                                                 ),
-                                          title: Text(title.toString()),
-                                          subtitle: Text('Status: $status'),
-                                        ),
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       );
                                     },
                                   );
-                                },
-                              );
-                            },
+                                }
+
+                                return TabBarView(
+                                  children: [
+                                    buildSwapList(active),
+                                    buildSwapList(past),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                         ],
                       ),
