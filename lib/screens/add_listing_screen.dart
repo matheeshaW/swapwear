@@ -1,21 +1,63 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-class AddListingScreen extends StatefulWidget {
-  final String userId;
-  const AddListingScreen({super.key, required this.userId});
+// data model to pass between steps
+class ListingData {
+  final String title;
+  final String description;
+  final String category;
+  final String size;
+  final String condition;
+  final List<String> tags;
+  final XFile? imageFile;
 
-  @override
-  State<AddListingScreen> createState() => _AddListingScreenState();
+  ListingData({
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.size,
+    required this.condition,
+    required this.tags,
+    this.imageFile,
+  });
+
+  ListingData copyWith({
+    String? title,
+    String? description,
+    String? category,
+    String? size,
+    String? condition,
+    List<String>? tags,
+    XFile? imageFile,
+  }) {
+    return ListingData(
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      size: size ?? this.size,
+      condition: condition ?? this.condition,
+      tags: tags ?? this.tags,
+      imageFile: imageFile ?? this.imageFile,
+    );
+  }
 }
 
-class _AddListingScreenState extends State<AddListingScreen> {
+// step 1 : Item Details
+class AddListingStep1Screen extends StatefulWidget {
+  final String userId;
+  const AddListingStep1Screen({super.key, required this.userId});
+
+  @override
+  State<AddListingStep1Screen> createState() => _AddListingStep1ScreenState();
+}
+
+class _AddListingStep1ScreenState extends State<AddListingStep1Screen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _tagsController = TextEditingController();
   String _selectedCategory = 'Tops';
   final List<String> _categories = [
     'Tops',
@@ -26,278 +68,299 @@ class _AddListingScreenState extends State<AddListingScreen> {
   ];
   String _selectedSize = 'M';
   String _selectedCondition = 'Like New';
-  XFile? _imageFile;
-  final ImagePicker _picker = ImagePicker();
-  bool _isUploading = false;
 
-  // pick image from gallery
-  Future<void> _pickImage() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() => _imageFile = picked);
-    }
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
-  // upload listing to Firebase
-  Future<void> _uploadListing() async {
-    if (_titleController.text.isEmpty || _imageFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter all details and pick an image!'),
-        ),
-      );
-      return;
-    }
-
-    if (_selectedCategory.isEmpty ||
+  void _goToStep2() {
+    if (_titleController.text.isEmpty ||
         _descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill description and category.')),
+        const SnackBar(content: Text('Please fill in title and description')),
       );
       return;
     }
 
-    setState(() => _isUploading = true);
+    final listingData = ListingData(
+      title: _titleController.text,
+      description: _descriptionController.text.trim(),
+      category: _selectedCategory,
+      size: _selectedSize,
+      condition: _selectedCondition,
+      tags: [],
+    );
 
-    try {
-      // upload image to Firebase Storage
-      final storageRef = FirebaseStorage.instance.ref().child(
-        'listing/${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-
-      await storageRef.putFile(File(_imageFile!.path));
-      final imageUrl = await storageRef.getDownloadURL();
-
-      // save listing in firebase
-      await FirebaseFirestore.instance.collection('listings').add({
-        'userId': widget.userId,
-        'title': _titleController.text,
-        'size': _selectedSize,
-        'condition': _selectedCondition,
-        'imageUrl': imageUrl,
-        'description': _descriptionController.text.trim(),
-        'category': _selectedCategory,
-        'tags': _tagsController.text
-            .split(',')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList(),
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Reset form
-      setState(() {
-        _isUploading = false;
-        _titleController.clear();
-        _imageFile = null;
-        _descriptionController.clear();
-        _tagsController.clear();
-        _selectedCategory = 'Tops';
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Listing uploaded successfully!')),
-      );
-    } catch (e) {
-      setState(() => _isUploading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddListingStep2Screen(
+          userId: widget.userId,
+          listingData: listingData,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Apparel Listing')),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Card(
-            elevation: 6,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // header with progress
+            Container(
+              color: Colors.green,
+              padding: const EdgeInsets.all(20),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Add New Listing',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   Text(
-                    'Create New Listing',
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      color: theme.colorScheme.primary,
+                    'Step 1 of 2',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // Title
-                  TextField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Item Title',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.title),
+                  const SizedBox(height: 16),
+                  // progress bar
+                  Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _descriptionController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Description',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: 0.5,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                      prefixIcon: const Icon(Icons.notes),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    items: _categories
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (val) =>
-                        setState(() => _selectedCategory = val!),
-                    decoration: InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.category_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Size dropdown
-                  DropdownButtonFormField<String>(
-                    value: _selectedSize,
-                    items: ['S', 'M', 'L', 'XL']
-                        .map(
-                          (size) =>
-                              DropdownMenuItem(value: size, child: Text(size)),
-                        )
-                        .toList(),
-                    onChanged: (val) => setState(() => _selectedSize = val!),
-                    decoration: InputDecoration(
-                      labelText: 'Size',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.straighten),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Condition dropdown
-                  DropdownButtonFormField<String>(
-                    value: _selectedCondition,
-                    items: ['New', 'Like New', 'Used', 'Worn']
-                        .map(
-                          (cond) =>
-                              DropdownMenuItem(value: cond, child: Text(cond)),
-                        )
-                        .toList(),
-                    onChanged: (val) =>
-                        setState(() => _selectedCondition = val!),
-                    decoration: InputDecoration(
-                      labelText: 'Condition',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.check_circle_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Tags(comma separated)
-                  TextField(
-                    controller: _tagsController,
-                    decoration: InputDecoration(
-                      labelText: 'Tags (comma-separated)',
-                      hintText: 'e.g. summer, casual, vintage',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.tag),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Image preview
-                  Center(
-                    child: GestureDetector(
-                      onTap: _pickImage,
-                      child: _imageFile != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: Image.file(
-                                File(_imageFile!.path),
-                                height: 160,
-                                width: 160,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Container(
-                              height: 160,
-                              width: 160,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: theme.colorScheme.primary.withOpacity(
-                                    0.2,
-                                  ),
-                                  width: 2,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.image,
-                                size: 60,
-                                color: Colors.grey,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: TextButton.icon(
-                      icon: Icon(
-                        Icons.photo_library,
-                        color: theme.colorScheme.primary,
-                      ),
-                      label: Text(
-                        'Pick Image',
-                        style: TextStyle(color: theme.colorScheme.primary),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: theme.colorScheme.primary,
-                        textStyle: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: _pickImage,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  // Upload button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isUploading ? null : _uploadListing,
-                      child: _isUploading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text('Upload Listing'),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
+            // Form context
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // title
+                    TextField(
+                      controller: _titleController,
+                      decoration: InputDecoration(
+                        labelText: 'Title',
+                        hintText: 'Enter item title...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // description
+                    TextField(
+                      controller: _descriptionController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'Describe your item...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // category
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: ListTile(
+                        title: Text('Category'),
+                        subtitle: Text(_selectedCategory),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Select Category'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: _categories.map((Category) {
+                                  return ListTile(
+                                    title: Text(Category),
+                                    onTap: () {
+                                      setState(
+                                        () => _selectedCategory = Category,
+                                      );
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Size and Condition row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: ListTile(
+                              title: const Text('Size'),
+                              subtitle: Text(_selectedSize),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 16,
+                              ),
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Select Size'),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: ['S', 'M', 'L', 'XL'].map((
+                                        size,
+                                      ) {
+                                        return ListTile(
+                                          title: Text(size),
+                                          onTap: () {
+                                            setState(
+                                              () => _selectedSize = size,
+                                            );
+                                            Navigator.pop(context);
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: ListTile(
+                              title: const Text('Condition'),
+                              subtitle: Text(_selectedCondition),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios,
+                                size: 16,
+                              ),
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Select Condition'),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children:
+                                          [
+                                            'New',
+                                            'Like New',
+                                            'Used',
+                                            'Worn',
+                                          ].map((condition) {
+                                            return ListTile(
+                                              title: Text(condition),
+                                              onTap: () {
+                                                setState(
+                                                  () => _selectedCondition =
+                                                      condition,
+                                                );
+                                                Navigator.pop(context);
+                                              },
+                                            );
+                                          }).toList(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    // Next button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _goToStep2,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Next',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
