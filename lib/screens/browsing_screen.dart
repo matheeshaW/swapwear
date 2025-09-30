@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/colors.dart';
@@ -45,6 +46,14 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   @override
   void initState() {
     super.initState();
+    // Verify the UID used by the screen equals the auth user
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    assert(
+      uid == widget.userId,
+      'UID mismatch: auth=$uid param=${widget.userId}',
+    );
+    // Optional: log it in release too
+    // debugPrint('Auth UID: $uid, Screen UID: ${widget.userId}');
     _loadAdmin();
     _loadWishlist();
   }
@@ -120,23 +129,37 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   }
 
   Future<void> _toggleWishlist(String listingId) async {
-    final wishRef = FirebaseFirestore.instance.collection('wishlists');
-    final query = await wishRef
-        .where('userId', isEqualTo: widget.userId)
-        .where('listingId', isEqualTo: listingId)
-        .get();
-    if (query.docs.isEmpty) {
-      await wishRef.add({
-        'userId': widget.userId,
-        'listingId': listingId,
-        'timestamp': FieldValue.serverTimestamp(),
+    try {
+      final col = FirebaseFirestore.instance.collection('wishlists');
+      final docId = '${widget.userId}_$listingId';
+      final ref = col.doc(docId);
+
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          tx.set(ref, {
+            'userId': widget.userId,
+            'listingId': listingId,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.delete(ref);
+        }
       });
-      setState(() => wishlist.add(listingId));
-    } else {
-      for (var doc in query.docs) {
-        await doc.reference.delete();
-      }
-      setState(() => wishlist.remove(listingId));
+
+      // Optimistic UI
+      setState(() {
+        if (wishlist.contains(listingId)) {
+          wishlist.remove(listingId);
+        } else {
+          wishlist.add(listingId);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Wishlist error: $e')));
     }
   }
 

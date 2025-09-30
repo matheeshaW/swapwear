@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'browsing_screen.dart';
 
 // data model to pass between steps
@@ -150,6 +151,16 @@ class _AddListingStep1ScreenState extends State<AddListingStep1Screen> {
   ];
   String _selectedSize = 'M';
   String _selectedCondition = 'Like New';
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    assert(
+      uid == widget.userId,
+      'UID mismatch (Step 1): auth=$uid param=${widget.userId}',
+    );
+  }
 
   @override
   void dispose() {
@@ -470,6 +481,11 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
   void initState() {
     super.initState();
     _tags = List.from(widget.listingData.tags);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    assert(
+      uid == widget.userId,
+      'UID mismatch (Step 2): auth=$uid param=${widget.userId}',
+    );
   }
 
   @override
