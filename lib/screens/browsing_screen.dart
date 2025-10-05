@@ -61,23 +61,14 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   Future<void> _loadAdmin() async {
     try {
       final isAdmin = await AdminService().isAdmin(widget.userId);
+      debugPrint("Admin check for ${widget.userId}: $isAdmin");
       if (mounted)
         setState(() {
           _isAdmin = isAdmin;
           _loading = false;
         });
-    } on FirebaseException catch (e) {
-      // Firestore unavailable or other Firebase errors
-      if (mounted)
-        setState(() {
-          _isAdmin = false; // fallback
-          _loading = false;
-        });
-      // Optionally show a snackbar instead of crashing
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Limited functionality offline: ${e.code}')),
-      // );
-    } catch (_) {
+    } catch (e) {
+      debugPrint("Admin check failed: $e");
       if (mounted)
         setState(() {
           _isAdmin = false;

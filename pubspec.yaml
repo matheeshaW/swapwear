@@ -101,6 +101,14 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "appIcon.png" # fallback
 
+  # Use the same master asset for both
+  image_path_ios: "appIcon.png"
+  image_path_android: "appIcon.png"
+
+  # Android adaptive icon (keeps visual size consistent)
   adaptive_icon_foreground: "appIcon.png"
+  adaptive_icon_background: "#FFFFFF" # or a brand color, or an image path
+
+  # iOS: strip alpha to comply and avoid odd rendering
+  remove_alpha_ios: true
