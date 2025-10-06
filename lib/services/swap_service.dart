@@ -49,6 +49,17 @@ class SwapService {
     }
   }
 
+  Future<void> confirmSwap(String swapId) async {
+    try {
+      await _db.collection('swaps').doc(swapId).update({
+        'status': 'confirmed',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to confirm swap: $e');
+    }
+  }
+
   Stream<List<SwapModel>> getUserSwaps(String userId) {
     try {
       final fromStream = _db

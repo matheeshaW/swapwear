@@ -42,14 +42,17 @@ class _MySwapsScreenState extends State<MySwapsScreen>
   Color _statusColor(String status) {
     switch (status) {
       case 'accepted':
+        return Colors.amber; // accepted badge yellow
+      case 'confirmed':
         return Colors.green;
       case 'rejected':
         return Colors.red;
       case 'completed':
         return Colors.grey;
       case 'pending':
+        return Colors.black54;
       default:
-        return Colors.blue;
+        return Colors.black54;
     }
   }
 
@@ -80,10 +83,13 @@ class _MySwapsScreenState extends State<MySwapsScreen>
         final bool isPending = status == 'pending';
         final bool isAccepted = status == 'accepted';
         final bool isRejected = status == 'rejected';
+        final bool isConfirmed = status == 'confirmed';
         final bool isReceiver = _uid == swap.toUserId;
 
         Color? cardTint;
-        if (isAccepted)
+        if (isConfirmed)
+          cardTint = Colors.green.withOpacity(0.06);
+        else if (isAccepted)
           cardTint = Colors.green.withOpacity(0.06);
         else if (isRejected)
           cardTint = Colors.red.withOpacity(0.06);
@@ -157,11 +163,33 @@ class _MySwapsScreenState extends State<MySwapsScreen>
                             horizontal: 8,
                           ),
                           decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Negotiation in progress – waiting for confirmation',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (isConfirmed) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 8,
+                          ),
+                          decoration: BoxDecoration(
                             color: Colors.green.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
-                            'Swap Accepted – Start Chat.',
+                            'Swap Confirmed ✅ – discuss delivery',
                             style: TextStyle(
                               color: Colors.green,
                               fontSize: 12,
@@ -292,7 +320,12 @@ class _MySwapsScreenState extends State<MySwapsScreen>
             }
             final swaps = snapshot.data ?? const <SwapModel>[];
             final active = swaps
-                .where((s) => s.status == 'pending' || s.status == 'accepted')
+                .where(
+                  (s) =>
+                      s.status == 'pending' ||
+                      s.status == 'accepted' ||
+                      s.status == 'confirmed',
+                )
                 .toList();
             final past = swaps
                 .where((s) => s.status == 'rejected' || s.status == 'completed')
