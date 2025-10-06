@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/chat_service.dart';
-import '../services/swap_service.dart';
+// Removed swap status updates from Chat; actions live in My Swaps screen
 import '../models/message_model.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -61,18 +61,19 @@ class _ChatScreenState extends State<ChatScreen> {
     bool isAccepted,
     bool isRejected,
   ) {
-    String status = swap['status'] ?? '';
+    // Status reflected only via visual banner; actions handled in My Swaps
+    // We intentionally don't branch on raw status here; booleans already derived
     Color color;
     String text;
     if (isAccepted) {
       color = Colors.green;
-      text = 'Swap Accepted';
+      text = 'Swap Accepted – Coordinate delivery.';
     } else if (isRejected) {
       color = Colors.red;
-      text = 'Swap Rejected';
+      text = 'Swap Rejected.';
     } else {
-      color = Colors.orange;
-      text = 'Swap Pending';
+      color = Colors.amber;
+      text = 'Swap Pending – Waiting for receiver.';
     }
     return Container(
       width: double.infinity,
@@ -84,37 +85,7 @@ class _ChatScreenState extends State<ChatScreen> {
             text,
             style: TextStyle(color: color, fontWeight: FontWeight.bold),
           ),
-          if (isRecipient && isPending) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                  ),
-                  onPressed: () async {
-                    await SwapService().updateSwapStatus(
-                      widget.swapId!,
-                      'accepted',
-                    );
-                  },
-                  child: const Text('Accept'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  onPressed: () async {
-                    await SwapService().updateSwapStatus(
-                      widget.swapId!,
-                      'rejected',
-                    );
-                  },
-                  child: const Text('Reject'),
-                ),
-              ],
-            ),
-          ],
+          // No actions here
         ],
       ),
     );
@@ -156,47 +127,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
         final status = swap['status'] ?? '';
-        final fromUserId = swap['fromUserId'] ?? '';
         final toUserId = swap['toUserId'] ?? '';
         final isRecipient = widget.currentUserId == toUserId;
         final isPending = status == 'pending';
         final isAccepted = status == 'accepted';
         final isRejected = status == 'rejected';
         return Scaffold(
-          appBar: AppBar(
-            title: _buildAppBarTitleWithStatus(swap),
-            actions: [
-              if (isRecipient && isPending)
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        await SwapService().updateSwapStatus(
-                          widget.swapId!,
-                          'accepted',
-                        );
-                      },
-                      child: const Text(
-                        'Accept',
-                        style: TextStyle(color: Colors.green),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        await SwapService().updateSwapStatus(
-                          widget.swapId!,
-                          'rejected',
-                        );
-                      },
-                      child: const Text(
-                        'Reject',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+          appBar: AppBar(title: _buildAppBarTitleWithStatus(swap)),
           body: Column(
             children: [
               _buildSwapStatusBanner(
@@ -257,10 +194,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? CrossAxisAlignment.end
                             : CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            msg.text ?? '',
-                            style: const TextStyle(fontSize: 16),
-                          ),
+                          Text(msg.text, style: const TextStyle(fontSize: 16)),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
