@@ -16,12 +16,27 @@ class MySwapsScreen extends StatefulWidget {
 class _MySwapsScreenState extends State<MySwapsScreen>
     with SingleTickerProviderStateMixin {
   late final String _uid;
+  late final Stream<List<SwapModel>> _swapsStream;
 
   @override
   void initState() {
     super.initState();
     final user = FirebaseAuth.instance.currentUser;
     _uid = user!.uid;
+    _swapsStream = FirebaseFirestore.instance
+        .collection('swaps')
+        .where(
+          Filter.or(
+            Filter('fromUserId', isEqualTo: _uid),
+            Filter('toUserId', isEqualTo: _uid),
+          ),
+        )
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((d) => SwapModel.fromMap(d.data(), d.id))
+              .toList(),
+        );
   }
 
   Color _statusColor(String status) {
@@ -62,9 +77,22 @@ class _MySwapsScreenState extends State<MySwapsScreen>
         final titles = snap.data ?? const ['...', '...'];
         final status = swap.status;
         final color = _statusColor(status);
+        final bool isPending = status == 'pending';
+        final bool isAccepted = status == 'accepted';
+        final bool isRejected = status == 'rejected';
+        final bool isReceiver = _uid == swap.toUserId;
+
+        Color? cardTint;
+        if (isAccepted)
+          cardTint = Colors.green.withOpacity(0.06);
+        else if (isRejected)
+          cardTint = Colors.red.withOpacity(0.06);
+        else if (isPending)
+          cardTint = Colors.amber.withOpacity(0.06);
+
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          color: Colors.white,
+          color: cardTint ?? Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -109,35 +137,126 @@ class _MySwapsScreenState extends State<MySwapsScreen>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          if (isPending && !isReceiver)
+                            const Text(
+                              'Waiting for receiver to accept...',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
                         ],
                       ),
+                      if (isAccepted) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Swap Accepted – Start Chat.',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (isRejected) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Swap Rejected.',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          chatId: swap.chatId,
-                          currentUserId: _uid,
-                          swapId: swap.id,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (isPending && isReceiver)
+                      Row(
+                        children: [
+                          ElevatedButton(
+                            onPressed: () async {
+                              await SwapService().updateSwapStatus(
+                                swap.id!,
+                                'accepted',
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Accept'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () async {
+                              await SwapService().updateSwapStatus(
+                                swap.id!,
+                                'rejected',
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Reject'),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF667eea),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              chatId: swap.chatId,
+                              currentUserId: _uid,
+                              swapId: swap.id,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF667eea),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: const TextStyle(fontSize: 13),
+                      ),
+                      child: const Text('Open Chat'),
                     ),
-                    textStyle: const TextStyle(fontSize: 13),
-                  ),
-                  child: const Text('Open Chat'),
+                  ],
                 ),
               ],
             ),
@@ -166,7 +285,7 @@ class _MySwapsScreenState extends State<MySwapsScreen>
           ),
         ),
         body: StreamBuilder<List<SwapModel>>(
-          stream: SwapService().getUserSwaps(_uid),
+          stream: _swapsStream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
