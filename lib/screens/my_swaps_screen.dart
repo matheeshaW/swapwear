@@ -13,8 +13,7 @@ class MySwapsScreen extends StatefulWidget {
   State<MySwapsScreen> createState() => _MySwapsScreenState();
 }
 
-class _MySwapsScreenState extends State<MySwapsScreen>
-    with SingleTickerProviderStateMixin {
+class _MySwapsScreenState extends State<MySwapsScreen> {
   late final String _uid;
   late final Stream<List<SwapModel>> _swapsStream;
 
@@ -56,59 +55,101 @@ class _MySwapsScreenState extends State<MySwapsScreen>
     }
   }
 
-  IconData _statusIcon(String status) {
-    switch (status) {
-      case 'accepted':
-        return Icons.handshake_outlined;
-      case 'confirmed':
-        return Icons.check_circle_outline;
-      case 'rejected':
-        return Icons.cancel_outlined;
-      case 'completed':
-        return Icons.done_all_rounded;
-      case 'pending':
-        return Icons.access_time_outlined;
-      default:
-        return Icons.swap_horiz;
-    }
-  }
-
-  Widget _buildSwapCard(BuildContext context, SwapModel swap) {
-    Future<List<String>> loadTitles() async {
+  // Compact card with thumbnails, titles, status chip, and date, preserving actions
+  Widget _buildCompactSwapCard(BuildContext context, SwapModel swap) {
+    Future<Map<String, dynamic>> loadListingMeta() async {
       final db = FirebaseFirestore.instance;
-      final offeredSnap = await db
+      final offered = await db
           .collection('listings')
           .doc(swap.listingOfferedId)
           .get();
-      final requestedSnap = await db
+      final requested = await db
           .collection('listings')
           .doc(swap.listingRequestedId)
           .get();
-      final offeredTitle =
-          offeredSnap.data()?['title']?.toString() ?? 'Unknown';
-      final requestedTitle =
-          requestedSnap.data()?['title']?.toString() ?? 'Unknown';
-      return <String>[offeredTitle, requestedTitle];
+      return {
+        'offeredTitle': offered.data()?['title']?.toString() ?? 'Unknown',
+        'offeredImage': (offered.data()?['imageUrl']?.toString() ?? ''),
+        'requestedTitle': requested.data()?['title']?.toString() ?? 'Unknown',
+        'requestedImage': (requested.data()?['imageUrl']?.toString() ?? ''),
+      };
     }
 
-    return FutureBuilder<List<String>>(
-      future: loadTitles(),
+    final status = swap.status;
+    final color = _statusColor(status);
+    final bool isPending = status == 'pending';
+    final bool isAccepted = status == 'accepted';
+    final bool isRejected = status == 'rejected';
+    final bool isConfirmed = status == 'confirmed';
+    final bool isReceiver = _uid == swap.toUserId;
+    final createdAtDate = swap.createdAt?.toDate();
+
+    Widget statusChip() {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Text(
+          status.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
+            letterSpacing: 0.4,
+          ),
+        ),
+      );
+    }
+
+    String dateLabel() {
+      if (createdAtDate == null) return '';
+      return '${createdAtDate.day.toString().padLeft(2, '0')}/${createdAtDate.month.toString().padLeft(2, '0')}/${createdAtDate.year}';
+    }
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: loadListingMeta(),
       builder: (context, snap) {
-        final titles = snap.data ?? const ['...', '...'];
-        final status = swap.status;
-        final color = _statusColor(status);
-        final icon = _statusIcon(status);
-        final bool isPending = status == 'pending';
-        final bool isAccepted = status == 'accepted';
-        final bool isRejected = status == 'rejected';
-        final bool isConfirmed = status == 'confirmed';
-        final bool isReceiver = _uid == swap.toUserId;
+        final meta =
+            snap.data ??
+            const {
+              'offeredTitle': '...',
+              'offeredImage': '',
+              'requestedTitle': '...',
+              'requestedImage': '',
+            };
+
+        Widget thumb(String url) {
+          final has = url.isNotEmpty;
+          return Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFD1FAE5)),
+              image: has
+                  ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: has
+                ? null
+                : const Icon(
+                    Icons.image_outlined,
+                    color: Color(0xFF10B981),
+                    size: 22,
+                  ),
+          );
+        }
 
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -118,365 +159,285 @@ class _MySwapsScreenState extends State<MySwapsScreen>
             ],
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with Status
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.08),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(icon, color: color, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            status.toUpperCase(),
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  thumb(meta['offeredImage'] as String),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meta['offeredTitle'] as String,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
-                          if (isPending && !isReceiver) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              'Waiting for response...',
-                              style: TextStyle(
-                                color: color.withOpacity(0.7),
-                                fontSize: 11,
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.sync_alt_rounded,
+                              size: 18,
+                              color: Color(0xFF10B981),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                meta['requestedTitle'] as String,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
-              // Swap Details
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Items being swapped
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  statusChip(),
+                  const Spacer(),
+                  if (createdAtDate != null)
                     Row(
                       children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFD1FAE5),
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'You Offer',
-                                  style: TextStyle(
-                                    color: Color(0xFF6B7280),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  titles[0],
-                                  style: const TextStyle(
-                                    color: Color(0xFF0F172A),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 14,
+                          color: Color(0xFF94A3B8),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Icon(
-                            Icons.sync_alt_rounded,
-                            color: const Color(0xFF10B981),
-                            size: 24,
-                          ),
-                        ),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: const Color(0xFFD1FAE5),
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'You Get',
-                                  style: TextStyle(
-                                    color: Color(0xFF6B7280),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  titles[1],
-                                  style: const TextStyle(
-                                    color: Color(0xFF0F172A),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
+                        const SizedBox(width: 4),
+                        Text(
+                          dateLabel(),
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-
-                    // Status Messages
-                    if (isAccepted) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDEF7EC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFF10B981),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: const Color(0xFF10B981),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Negotiation in progress – waiting for final confirmation',
-                                style: TextStyle(
-                                  color: const Color(0xFF065F46),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (isConfirmed) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDEF7EC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFF10B981),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.celebration_outlined,
-                              color: const Color(0xFF10B981),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Swap confirmed! Discuss delivery details in chat',
-                                style: TextStyle(
-                                  color: const Color(0xFF065F46),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (isRejected) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: const Color(0xFFEF4444),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: const Color(0xFFEF4444),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'This swap request was declined',
-                                style: TextStyle(
-                                  color: const Color(0xFF991B1B),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Action Buttons
-                    const SizedBox(height: 16),
-                    if (isPending && isReceiver)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await SwapService().updateSwapStatus(
-                                  swap.id!,
-                                  'accepted',
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text(
-                                'Accept',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                await SwapService().updateSwapStatus(
-                                  swap.id!,
-                                  'rejected',
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFEF4444),
-                                side: const BorderSide(
-                                  color: Color(0xFFEF4444),
-                                  width: 1.5,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: const Text(
-                                'Reject',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(
-                                  chatId: swap.chatId,
-                                  currentUserId: _uid,
-                                  swapId: swap.id,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                          label: const Text(
-                            'Open Chat',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
+              const SizedBox(height: 12),
+              if (isPending && isReceiver)
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await SwapService().updateSwapStatus(
+                            swap.id!,
+                            'accepted',
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Accept',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          await SwapService().updateSwapStatus(
+                            swap.id!,
+                            'rejected',
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEF4444),
+                          side: const BorderSide(
+                            color: Color(0xFFEF4444),
+                            width: 1.5,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Reject',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(
+                            chatId: swap.chatId,
+                            currentUserId: _uid,
+                            swapId: swap.id,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                    label: const Text(
+                      'Open Chat',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+
+              if (isAccepted) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDEF7EC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF10B981),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(
+                        Icons.info_outline,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Negotiation in progress – waiting for final confirmation',
+                          style: TextStyle(
+                            color: Color(0xFF065F46),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (isConfirmed) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDEF7EC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF10B981),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(
+                        Icons.celebration_outlined,
+                        color: Color(0xFF10B981),
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Swap confirmed! Discuss delivery details in chat',
+                          style: TextStyle(
+                            color: Color(0xFF065F46),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (isRejected) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFEF4444),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(
+                        Icons.error_outline,
+                        color: Color(0xFFEF4444),
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This swap request was declined',
+                          style: TextStyle(
+                            color: Color(0xFF991B1B),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -484,125 +445,143 @@ class _MySwapsScreenState extends State<MySwapsScreen>
     );
   }
 
+  // removed unused _statusIcon (compact card uses chip-style only)
+
+  // removed legacy _buildSwapCard (replaced by _buildCompactSwapCard)
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF0FDF4),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Color(0xFF10B981)),
-          title: const Text(
-            'My Swaps',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontWeight: FontWeight.w600,
-            ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0FDF4),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF10B981)),
+        title: const Text(
+          'My Swaps',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w600,
           ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(48),
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFFD1FAE5), width: 1),
-                ),
-              ),
-              child: const TabBar(
-                labelColor: Color(0xFF10B981),
-                unselectedLabelColor: Color(0xFF6B7280),
-                indicatorColor: Color(0xFF10B981),
-                indicatorWeight: 3,
-                labelStyle: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-                unselectedLabelStyle: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                ),
-                tabs: [
-                  Tab(text: 'Active'),
-                  Tab(text: 'Past'),
+        ),
+      ),
+      body: StreamBuilder<List<SwapModel>>(
+        stream: _swapsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF10B981)),
+            );
+          }
+          final swaps = snapshot.data ?? const <SwapModel>[];
+
+          final pending = swaps.where((s) => s.status == 'pending').toList();
+          final accepted = swaps.where((s) => s.status == 'accepted').toList();
+          final confirmed = swaps
+              .where((s) => s.status == 'confirmed')
+              .toList();
+          final rejected = swaps.where((s) => s.status == 'rejected').toList();
+          final completed = swaps
+              .where((s) => s.status == 'completed')
+              .toList();
+
+          if (swaps.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(
+                    Icons.swap_horiz_rounded,
+                    size: 64,
+                    color: Color(0xFFD1FAE5),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No swaps yet',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Your swaps will appear here',
+                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                  ),
                 ],
               ),
-            ),
-          ),
-        ),
-        body: StreamBuilder<List<SwapModel>>(
-          stream: _swapsStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF10B981)),
-              );
-            }
-            final swaps = snapshot.data ?? const <SwapModel>[];
-            final active = swaps
-                .where(
-                  (s) =>
-                      s.status == 'pending' ||
-                      s.status == 'accepted' ||
-                      s.status == 'confirmed',
-                )
-                .toList();
-            final past = swaps
-                .where((s) => s.status == 'rejected' || s.status == 'completed')
-                .toList();
-
-            Widget buildList(List<SwapModel> list, bool isActive) {
-              if (list.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        isActive
-                            ? Icons.recycling_outlined
-                            : Icons.history_outlined,
-                        size: 64,
-                        color: const Color(0xFFD1FAE5),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        isActive ? 'No active swaps' : 'No past swaps',
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        isActive
-                            ? 'Start swapping to see your exchanges here'
-                            : 'Completed swaps will appear here',
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                itemCount: list.length,
-                itemBuilder: (context, index) {
-                  final swap = list[index];
-                  return _buildSwapCard(context, swap);
-                },
-              );
-            }
-
-            return TabBarView(
-              children: [buildList(active, true), buildList(past, false)],
             );
-          },
-        ),
+          }
+
+          List<Widget> sections = [];
+
+          Widget sectionHeader(String label, int count) {
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              margin: const EdgeInsets.only(top: 12, bottom: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Text(
+                      count.toString(),
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          void addSection(String label, List<SwapModel> list) {
+            if (list.isEmpty) return;
+            sections.add(sectionHeader(label, list.length));
+            for (final s in list) {
+              sections.add(_buildCompactSwapCard(context, s));
+            }
+          }
+
+          addSection('🕒 Pending Requests', pending);
+          addSection('🤝 Accepted Swaps', accepted);
+          addSection('✅ Confirmed Swaps', confirmed);
+          addSection('❌ Rejected Swaps', rejected);
+          addSection('🏁 Completed Swaps', completed);
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: sections,
+            ),
+          );
+        },
       ),
     );
   }
