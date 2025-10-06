@@ -15,6 +15,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final _adminService = AdminService();
   bool _isAdmin = false;
   bool _loading = true;
+  bool _showUserManagement = false;
 
   @override
   void initState() {
@@ -179,110 +180,206 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        actions: [
-          IconButton(
-            onPressed: _addAdminDialog,
-            icon: const Icon(Icons.admin_panel_settings),
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _adminService.streamAllUsers(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final docs = snapshot.data!.docs;
-          if (docs.isEmpty) return const Center(child: Text('No users'));
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final d = docs[index].data();
-              final uid = docs[index].id;
-              final title = d['name']?.toString().isNotEmpty == true
-                  ? d['name']
-                  : d['email'] ?? uid;
-              final email = d['email'] ?? uid;
-              return Container(
+      appBar: AppBar(title: const Text('Admin Dashboard')),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 52,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.indigo[50],
-                    child: const Icon(
-                      Icons.person_outline,
-                      color: Color(0xFF667eea),
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.people_outline, color: Colors.white),
+                  label: const Text(
+                    'User Management',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
                     ),
                   ),
-                  title: Text(
-                    title.toString(),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    minimumSize: const Size.fromHeight(52),
                   ),
-                  subtitle: Text(email.toString()),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Edit',
-                        onPressed: () => _editUserDialog(docs[index]),
-                        icon: const Icon(Icons.edit_outlined),
-                      ),
-                      IconButton(
-                        tooltip: 'Delete',
-                        onPressed: () async {
-                          final confirmed =
-                              await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Deactivate user?'),
-                                  content: Text(
-                                    'This will delete profile for $uid.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
+                  onPressed: () {
+                    setState(() {
+                      _showUserManagement = !_showUserManagement;
+                    });
+                  },
+                ),
+              ),
+              Container(
+                height: 52,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF764ba2), Color(0xFF667eea)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ElevatedButton.icon(
+                  icon: const Icon(
+                    Icons.admin_panel_settings,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    'Add Admin',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: _addAdminDialog,
+                ),
+              ),
+              // Placeholder for future admin features
+              // Example: Analytics, Reports, etc.
+              if (_showUserManagement) ...[
+                const Text(
+                  'All Users',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 600, // or MediaQuery height - adjust as needed
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: _adminService.streamAllUsers(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final docs = snapshot.data!.docs;
+                      if (docs.isEmpty)
+                        return const Center(child: Text('No users'));
+                      return ListView.builder(
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final d = docs[index].data();
+                          final uid = docs[index].id;
+                          final title = d['name']?.toString().isNotEmpty == true
+                              ? d['name']
+                              : d['email'] ?? uid;
+                          final email = d['email'] ?? uid;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 6),
                                 ),
-                              ) ??
-                              false;
-                          if (confirmed) {
-                            await _adminService.deleteUser(uid);
-                          }
+                              ],
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.indigo[50],
+                                child: const Icon(
+                                  Icons.person_outline,
+                                  color: Color(0xFF667eea),
+                                ),
+                              ),
+                              title: Text(
+                                title.toString(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(email.toString()),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Edit',
+                                    onPressed: () =>
+                                        _editUserDialog(docs[index]),
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete',
+                                    onPressed: () async {
+                                      final confirmed =
+                                          await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text(
+                                                'Deactivate user?',
+                                              ),
+                                              content: Text(
+                                                'This will delete profile for $uid.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        context,
+                                                        false,
+                                                      ),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                ElevatedButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        context,
+                                                        true,
+                                                      ),
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
+                                            ),
+                                          ) ??
+                                          false;
+                                      if (confirmed) {
+                                        await _adminService.deleteUser(uid);
+                                      }
+                                    },
+                                    icon: const Icon(Icons.delete_outline),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
                         },
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
-              );
-            },
-          );
-        },
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
