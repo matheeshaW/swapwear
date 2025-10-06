@@ -8,7 +8,8 @@ class SwapModel {
   final String listingRequestedId;
   final String fromUserId;
   final String toUserId;
-  final String status; // "pending" | "accepted" | "rejected" | "completed"
+  final String
+  status; // "pending" | "accepted" | "confirmed" | "rejected" | "completed"
   final String chatId;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
