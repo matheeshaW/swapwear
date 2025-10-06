@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/chat_service.dart';
 // Removed swap status updates from Chat; actions live in My Swaps screen
 import '../models/message_model.dart';
+import '../services/swap_service.dart';
+import 'confirm_swap_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -65,12 +67,15 @@ class _ChatScreenState extends State<ChatScreen> {
     // We intentionally don't branch on raw status here; booleans already derived
     Color color;
     String text;
-    if (isAccepted) {
-      color = Colors.green;
-      text = 'Swap Accepted – Coordinate delivery.';
-    } else if (isRejected) {
+    if (isRejected) {
       color = Colors.red;
       text = 'Swap Rejected.';
+    } else if (swap['status'] == 'confirmed') {
+      color = Colors.green;
+      text = 'Swap Confirmed ✅ – discuss delivery';
+    } else if (isAccepted) {
+      color = Colors.blue;
+      text = 'Negotiation in progress – waiting for confirmation';
     } else {
       color = Colors.amber;
       text = 'Swap Pending – Waiting for receiver.';
@@ -85,7 +90,54 @@ class _ChatScreenState extends State<ChatScreen> {
             text,
             style: TextStyle(color: color, fontWeight: FontWeight.bold),
           ),
-          // No actions here
+          if (isAccepted && isRecipient) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    // Navigate to confirm screen
+                    final listingOfferedId = (swap['listingOfferedId'] ?? '')
+                        .toString();
+                    final listingRequestedId =
+                        (swap['listingRequestedId'] ?? '').toString();
+                    if (listingOfferedId.isEmpty || listingRequestedId.isEmpty)
+                      return;
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ConfirmSwapScreen(
+                          swapId: widget.swapId!,
+                          listingOfferedId: listingOfferedId,
+                          listingRequestedId: listingRequestedId,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Confirm'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: () async {
+                    await SwapService().updateSwapStatus(
+                      widget.swapId!,
+                      'rejected',
+                    );
+                  },
+                  child: const Text(
+                    'Reject',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
