@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
@@ -102,12 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: const Icon(Icons.edit, color: Colors.blue),
                           tooltip: 'Edit',
                           onPressed: () {
-                            // TODO: navigate to edit listing screen
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Edit listing not implemented'),
-                              ),
-                            );
+                            _showEditListingDialog(context, listingId, data);
                           },
                         ),
                         IconButton(
@@ -162,13 +159,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
   bool _photoUploading = false;
 
-  late final String _uid;
+  final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    _uid = user!.uid;
+
     _loadProfile();
   }
 
@@ -184,7 +180,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = (data['preferences'] as List<dynamic>? ?? [])
           .cast<String>();
       _prefsController.text = prefs.join(', ');
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error loading profile: $e');
+      debugPrint(stack.toString());
       _error = 'Failed to load profile';
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -251,107 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imageQuality: 85,
         maxWidth: 1280,
       );
-      const Text(
-        'Your Listings',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      );
-      const SizedBox(height: 8);
-      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection('listings')
-            .where('ownerId', isEqualTo: _uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Text('No listings added yet');
-          }
-          final docs = snapshot.data!.docs;
-          return ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: docs.length,
-            separatorBuilder: (context, idx) => const SizedBox(height: 8),
-            itemBuilder: (context, idx) {
-              final data = docs[idx].data();
-              final listingId = docs[idx].id;
-              return Card(
-                elevation: 1,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  leading:
-                      data['imageUrl'] != null &&
-                          data['imageUrl'].toString().isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            data['imageUrl'],
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : const Icon(Icons.image, size: 40),
-                  title: Text(data['title'] ?? 'Untitled'),
-                  subtitle: Text(data['category'] ?? ''),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.blue),
-                        tooltip: 'Edit',
-                        onPressed: () {
-                          // TODO: Implement navigation to edit listing screen
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Edit not implemented'),
-                            ),
-                          );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        tooltip: 'Delete',
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Delete Listing'),
-                              content: const Text(
-                                'Are you sure you want to delete this listing?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            await _deleteListing(listingId);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
+      // ...existing code...
 
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
@@ -437,6 +335,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
+  }
+
+  Future<void> _showEditListingDialog(
+    BuildContext context,
+    String listingId,
+    Map<String, dynamic> data,
+  ) async {
+    final titleController = TextEditingController(text: data['title'] ?? '');
+    final sizeController = TextEditingController(text: data['size'] ?? '');
+    final conditionController = TextEditingController(
+      text: data['condition'] ?? '',
+    );
+    final categoryController = TextEditingController(
+      text: data['category'] ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: data['description'] ?? '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Listing'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+              ),
+              TextField(
+                controller: sizeController,
+                decoration: const InputDecoration(labelText: 'Size'),
+              ),
+              TextField(
+                controller: conditionController,
+                decoration: const InputDecoration(labelText: 'Condition'),
+              ),
+              TextField(
+                controller: categoryController,
+                decoration: const InputDecoration(labelText: 'Category'),
+              ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await FirebaseFirestore.instance
+                    .collection('listings')
+                    .doc(listingId)
+                    .update({
+                      'title': titleController.text.trim(),
+                      'size': sizeController.text.trim(),
+                      'condition': conditionController.text.trim(),
+                      'category': categoryController.text.trim(),
+                      'description': descriptionController.text.trim(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Listing updated successfully'),
+                    ),
+                  );
+                  setState(() {}); // refresh UI
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
