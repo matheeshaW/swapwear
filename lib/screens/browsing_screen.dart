@@ -23,6 +23,8 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   bool _isAdmin = false;
   bool _loading = true;
 
+  List<String> _userPreferences = [];
+
   // for wishlist state
   Set<String> wishlist = {};
 
@@ -55,6 +57,24 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     );
     _loadAdmin();
     _loadWishlist();
+    _loadUserPreferences();
+  }
+
+  Future<void> _loadUserPreferences() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      if (doc.exists && doc.data()?['preferences'] != null) {
+        final prefs = List<String>.from(doc['preferences']);
+        setState(() => _userPreferences = prefs);
+        debugPrint('Loaded user preferences: $_userPreferences');
+      }
+    } catch (e) {
+      debugPrint('Failed to load preferences: $e');
+    }
   }
 
   Future<void> _loadAdmin() async {
@@ -151,6 +171,33 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Wishlist error: $e')));
     }
+  }
+
+  bool _matchesPreference(Map<String, dynamic> data) {
+    if (_userPreferences.isEmpty) return false;
+
+    final category = (data['category'] ?? '').toString().toLowerCase();
+    final title = (data['title'] ?? '').toString().toLowerCase();
+
+    // Safely read tags (it might be null, a list, or even a single string)
+    List<String> tags = [];
+    final rawTags = data['tags'];
+    if (rawTags is List) {
+      tags = rawTags.map((e) => e.toString().toLowerCase()).toList();
+    } else if (rawTags is String) {
+      tags = [rawTags.toLowerCase()];
+    }
+
+    // Now safely check for matches
+    for (final pref in _userPreferences.map((p) => p.toLowerCase())) {
+      if (category.contains(pref) ||
+          title.contains(pref) ||
+          tags.any((t) => t.contains(pref))) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   Widget _buildOptimizedImage(String imageUrl) {
@@ -484,25 +531,37 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   }
                   final docs = snapshot.data!.docs;
 
-                  // Client-side sort when filters are active
+                  // Determine if any filters are active
                   final hasFilters =
                       (selectedCategory != null && selectedCategory != 'All') ||
                       (selectedSize != null && selectedSize != 'All') ||
                       (selectedCondition != null && selectedCondition != 'All');
 
-                  final sortedDocs = hasFilters
-                      ? (docs.toList()..sort((a, b) {
-                          final ta = (a['timestamp'] as Timestamp?);
-                          final tb = (b['timestamp'] as Timestamp?);
-                          final da = ta?.toDate();
-                          final db = tb?.toDate();
-                          if (da == null && db == null) return 0;
-                          if (da == null) return 1;
-                          if (db == null) return -1;
-                          final cmp = da.compareTo(db);
-                          return (sortBy == 'Newest') ? -cmp : cmp;
-                        }))
-                      : docs;
+                  // Start with a copy
+                  final sortedDocs = docs.toList();
+
+                  // Always sort once (includes both preference + timestamp logic)
+                  sortedDocs.sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+
+                    // 1️⃣ Preference relevance
+                    final aMatch = _matchesPreference(aData);
+                    final bMatch = _matchesPreference(bData);
+
+                    if (aMatch && !bMatch) return -1;
+                    if (!aMatch && bMatch) return 1;
+
+                    // 2️⃣ Fallback: timestamp sorting
+                    final ta = (aData['timestamp'] as Timestamp?)?.toDate();
+                    final tb = (bData['timestamp'] as Timestamp?)?.toDate();
+                    if (ta == null && tb == null) return 0;
+                    if (ta == null) return 1;
+                    if (tb == null) return -1;
+                    final cmp = ta.compareTo(tb);
+                    return (sortBy == 'Newest') ? -cmp : cmp;
+                  });
+
                   return ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -569,7 +628,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                                     wishlistSet.contains(
                                                       listingId,
                                                     )
-                                                    ? Colors.red
+                                                    ? AppColors.primary
                                                     : Colors.grey,
                                                 size: 22,
                                               ),
@@ -703,19 +762,25 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.grey,
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddListingScreen(userId: widget.userId),
-            ),
-          );
-        },
-        child: const Icon(Icons.add, size: 32),
-      ),
+
+      // ✅ Only show FAB on the browsing tab
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        AddListingScreen(userId: widget.userId),
+                  ),
+                );
+              },
+              child: const Icon(Icons.add, size: 32),
+            )
+          : null,
+
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
