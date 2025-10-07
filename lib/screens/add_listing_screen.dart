@@ -536,9 +536,10 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
       await storageRef.putFile(File(_imageFile!.path));
       final imageUrl = await storageRef.getDownloadURL();
 
-      // save listing in firebase
+      // save listing in firebase, add ownerId for user filtering
       await FirebaseFirestore.instance.collection('listings').add({
         'userId': widget.userId,
+        'ownerId': FirebaseAuth.instance.currentUser?.uid ?? widget.userId,
         'title': widget.listingData.title,
         'size': widget.listingData.size,
         'condition': widget.listingData.condition,
