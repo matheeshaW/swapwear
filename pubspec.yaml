@@ -2,7 +2,7 @@ name: swapwear
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -34,8 +34,14 @@ dependencies:
   # Add Firebase core
   firebase_core: ^3.15.2
   firebase_auth: ^5.7.0
-  cloud_firestore: ^5.4.4
+  cloud_firestore: ^5.6.12
   google_sign_in: ^6.2.1
+  cloud_functions: ^5.1.4
+  image_picker: ^1.1.2
+  firebase_storage: ^12.3.6
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^17.1.2
+  
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -52,12 +58,13 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
 
+  flutter_launcher_icons: ^0.13.1
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -93,3 +100,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "appIcon.png" # fallback
+
+  adaptive_icon_foreground: "appIcon.png"
