@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:swapwear/theme/colors.dart';
 import 'browsing_screen.dart';
 
 // data model to pass between steps
@@ -208,7 +209,7 @@ class _AddListingStep1ScreenState extends State<AddListingStep1Screen> {
           children: [
             // header with progress
             Container(
-              color: Colors.green,
+              color: AppColors.primary,
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
@@ -579,7 +580,7 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
           children: [
             // header with progress
             Container(
-              color: Colors.green,
+              color: AppColors.primary,
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [

@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
@@ -87,11 +86,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             data['imageUrl'].toString().isNotEmpty
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              data['imageUrl'],
+                            child: CachedNetworkImage(
+                              imageUrl: data['imageUrl'],
                               width: 48,
                               height: 48,
                               fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.grey.shade200,
+                                child: const Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.grey,
+                                  size: 24,
+                                ),
+                              ),
                             ),
                           )
                         : const Icon(Icons.image, size: 40),

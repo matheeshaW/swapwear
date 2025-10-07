@@ -764,6 +764,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
           ? FloatingActionButton(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30), // adjust roundness
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
