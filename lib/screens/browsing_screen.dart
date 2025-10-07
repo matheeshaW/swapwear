@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/colors.dart';
 import 'add_listing_screen.dart';
 import 'wishlist_screen.dart';
@@ -21,7 +23,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   bool _isAdmin = false;
   bool _loading = true;
 
-  // For wishlist state
+  List<String> _userPreferences = [];
+
+  // for wishlist state
   Set<String> wishlist = {};
 
   // Filters and sorting
@@ -45,30 +49,45 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   @override
   void initState() {
     super.initState();
+    // verify the UID used by the screen equals the auth user
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    assert(
+      uid == widget.userId,
+      'UID mismatch: auth=$uid param=${widget.userId}',
+    );
     _loadAdmin();
     _loadWishlist();
+    _loadUserPreferences();
+  }
+
+  Future<void> _loadUserPreferences() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      if (doc.exists && doc.data()?['preferences'] != null) {
+        final prefs = List<String>.from(doc['preferences']);
+        setState(() => _userPreferences = prefs);
+        debugPrint('Loaded user preferences: $_userPreferences');
+      }
+    } catch (e) {
+      debugPrint('Failed to load preferences: $e');
+    }
   }
 
   Future<void> _loadAdmin() async {
     try {
       final isAdmin = await AdminService().isAdmin(widget.userId);
+      debugPrint('Admin check for ${widget.userId}: $isAdmin');
       if (mounted)
         setState(() {
           _isAdmin = isAdmin;
           _loading = false;
         });
-    } on FirebaseException catch (e) {
-      // Firestore unavailable or other Firebase errors
-      if (mounted)
-        setState(() {
-          _isAdmin = false; // fallback
-          _loading = false;
-        });
-      // Optionally show a snackbar instead of crashing
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(content: Text('Limited functionality offline: ${e.code}')),
-      // );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Admin check failed: $e');
       if (mounted)
         setState(() {
           _isAdmin = false;
@@ -82,6 +101,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
         .collection('wishlists')
         .where('userId', isEqualTo: widget.userId)
         .get();
+
     setState(() {
       wishlist = snap.docs.map((d) => d['listingId'] as String).toSet();
     });
@@ -111,8 +131,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     if (hasCondition) {
       query = query.where('condition', isEqualTo: selectedCondition);
     }
-
-    // Only orderBy when no filters (avoids composite index requirements)
+    // only orderBy wher no filters (avoids composite index requirements)
     if (!hasCategory && !hasSize && !hasCondition) {
       query = query.orderBy('timestamp', descending: sortBy == 'Newest');
     }
@@ -120,82 +139,300 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   }
 
   Future<void> _toggleWishlist(String listingId) async {
-    final wishRef = FirebaseFirestore.instance.collection('wishlists');
-    final query = await wishRef
-        .where('userId', isEqualTo: widget.userId)
-        .where('listingId', isEqualTo: listingId)
-        .get();
-    if (query.docs.isEmpty) {
-      await wishRef.add({
-        'userId': widget.userId,
-        'listingId': listingId,
-        'timestamp': FieldValue.serverTimestamp(),
+    try {
+      final col = FirebaseFirestore.instance.collection('wishlists');
+      final docId = '${widget.userId}_$listingId';
+      final ref = col.doc(docId);
+
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          tx.set(ref, {
+            'userId': widget.userId,
+            'listingId': listingId,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.delete(ref);
+        }
       });
-      setState(() => wishlist.add(listingId));
-    } else {
-      for (var doc in query.docs) {
-        await doc.reference.delete();
-      }
-      setState(() => wishlist.remove(listingId));
+
+      // optimistic UI
+      setState(() {
+        if (wishlist.contains(listingId)) {
+          wishlist.remove(listingId);
+        } else {
+          wishlist.add(listingId);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Wishlist error: $e')));
     }
   }
 
-  void _showDetailModal(Map<String, dynamic> data) {
+  /// Returns the number of preference matches (tags, category, or title)
+  int _preferenceMatchCount(Map<String, dynamic> data) {
+    if (_userPreferences.isEmpty) return 0;
+
+    final category = (data['category'] ?? '').toString().toLowerCase();
+    final title = (data['title'] ?? '').toString().toLowerCase();
+
+    // Safely read tags (it might be null, a list, or even a single string)
+    List<String> tags = [];
+    final rawTags = data['tags'];
+    if (rawTags is List) {
+      tags = rawTags.map((e) => e.toString().toLowerCase()).toList();
+    } else if (rawTags is String) {
+      tags = [rawTags.toLowerCase()];
+    }
+
+    int count = 0;
+    for (final pref in _userPreferences.map((p) => p.toLowerCase())) {
+      if (category.contains(pref)) count++;
+      if (title.contains(pref)) count++;
+      count += tags.where((t) => t.contains(pref)).length;
+    }
+    return count;
+  }
+
+  Widget _buildOptimizedImage(String imageUrl) {
+    if (imageUrl.isEmpty) {
+      return Container(
+        width: 80,
+        height: 80,
+        color: Colors.grey.shade200,
+        child: const Icon(
+          Icons.image_not_supported,
+          color: Colors.grey,
+          size: 30,
+        ),
+      );
+    }
+
+    // Try CachedNetworkImage first, but with simpler configuration
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      width: 80,
+      height: 80,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        width: 80,
+        height: 80,
+        color: Colors.grey.shade200,
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) {
+        debugPrint('CachedNetworkImage error: $error for URL: $url');
+        // Fallback to regular Image.network
+        return Image.network(
+          imageUrl,
+          width: 80,
+          height: 80,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: 80,
+              height: 80,
+              color: Colors.grey.shade200,
+              child: const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint('Image.network error: $error for URL: $imageUrl');
+            return Container(
+              width: 80,
+              height: 80,
+              color: Colors.grey.shade200,
+              child: const Icon(
+                Icons.image_not_supported,
+                color: Colors.grey,
+                size: 30,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(top: 16, bottom: 12),
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
+      ),
+      child: const Center(
+        child: Text(
+          'Browse Listings',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(
+    String label,
+    String selectedValue,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                '$label',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCategoryFilter() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  data['imageUrl'],
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
+            const Text(
+              'Select Category',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            Text(
-              data['title'] ?? '',
-              style: Theme.of(context).textTheme.headlineLarge,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Chip(
-                  label: Text('Size:  ${data['size']}'),
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                ),
-                const SizedBox(width: 8),
-                Chip(
-                  label: Text('Condition:  ${data['condition']}'),
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            if (data['description'] != null)
-              Text(
-                data['description'],
-                style: Theme.of(context).textTheme.bodyMedium,
+            ...categories.map(
+              (category) => ListTile(
+                title: Text(category),
+                trailing: (selectedCategory ?? 'All') == category
+                    ? const Icon(Icons.check, color: AppColors.primary)
+                    : null,
+                onTap: () {
+                  setState(() => selectedCategory = category);
+                  Navigator.pop(context);
+                },
               ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: null, // Not implemented
-                child: const Text('Request Swap'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSizeFilter() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Select Size',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            ...sizes.map(
+              (size) => ListTile(
+                title: Text(size),
+                trailing: (selectedSize ?? 'All') == size
+                    ? const Icon(Icons.check, color: AppColors.primary)
+                    : null,
+                onTap: () {
+                  setState(() => selectedSize = size);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showConditionFilter() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Select Condition',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            ...conditions.map(
+              (condition) => ListTile(
+                title: Text(condition),
+                trailing: (selectedCondition ?? 'All') == condition
+                    ? const Icon(Icons.check, color: AppColors.primary)
+                    : null,
+                onTap: () {
+                  setState(() => selectedCondition = condition);
+                  Navigator.pop(context);
+                },
               ),
             ),
           ],
@@ -207,14 +444,16 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   Widget _buildBrowseTab() {
     return Column(
       children: [
+        // Green header
+        _buildHeader(),
         // Search bar
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: SizedBox(
             height: 44,
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search apparel... ',
+                hintText: 'Search items...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -233,184 +472,35 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
             ),
           ),
         ),
-        // Modern filter & sort bar
+        // Filter buttons row
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            color: AppColors.secondary,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 8,
-                    children: [
-                      // Size filter as ChoiceChips
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Size:',
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(width: 6),
-                          ...['All', 'S', 'M', 'L', 'XL'].map(
-                            (sz) => Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 2,
-                              ),
-                              child: ChoiceChip(
-                                label: Text(sz),
-                                selected: (selectedSize ?? 'All') == sz,
-                                selectedColor: AppColors.primary,
-                                backgroundColor: Colors.white,
-                                labelStyle: TextStyle(
-                                  color: (selectedSize ?? 'All') == sz
-                                      ? Colors.white
-                                      : AppColors.accent,
-                                ),
-                                onSelected: (_) =>
-                                    setState(() => selectedSize = sz),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Condition filter as ChoiceChips
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Condition:',
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                ...[
-                                  'All',
-                                  'New',
-                                  'Like New',
-                                  'Used',
-                                  'Worn',
-                                ].map(
-                                  (cond) => ChoiceChip(
-                                    label: Text(cond),
-                                    selected:
-                                        (selectedCondition ?? 'All') == cond,
-                                    selectedColor: AppColors.primary,
-                                    backgroundColor: Colors.white,
-                                    labelStyle: TextStyle(
-                                      color:
-                                          (selectedCondition ?? 'All') == cond
-                                          ? Colors.white
-                                          : AppColors.accent,
-                                    ),
-                                    onSelected: (_) => setState(
-                                      () => selectedCondition = cond,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Category:',
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: categories
-                                  .map(
-                                    (cat) => ChoiceChip(
-                                      label: Text(cat),
-                                      selected:
-                                          (selectedCategory ?? 'All') == cat,
-                                      selectedColor: AppColors.primary,
-                                      backgroundColor: Colors.white,
-                                      labelStyle: TextStyle(
-                                        color:
-                                            (selectedCategory ?? 'All') == cat
-                                            ? Colors.white
-                                            : AppColors.accent,
-                                      ),
-                                      onSelected: (_) => setState(
-                                        () => selectedCategory = cat,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Sort by as pill toggle
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'Sort:',
-                            style: TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const SizedBox(width: 6),
-                          ToggleButtons(
-                            borderRadius: BorderRadius.circular(18),
-                            isSelected: [
-                              sortBy == 'Newest',
-                              sortBy == 'Oldest',
-                            ],
-                            selectedColor: Colors.white,
-                            fillColor: AppColors.primary,
-                            color: AppColors.accent,
-                            children: const [
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text('Newest'),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12),
-                                child: Text('Oldest'),
-                              ),
-                            ],
-                            onPressed: (idx) {
-                              setState(
-                                () => sortBy = idx == 0 ? 'Newest' : 'Oldest',
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildFilterButton(
+                  'Category',
+                  selectedCategory ?? 'All',
+                  () => _showCategoryFilter(),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildFilterButton(
+                  'Size',
+                  selectedSize ?? 'All',
+                  () => _showSizeFilter(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildFilterButton(
+                  'Condition',
+                  selectedCondition ?? 'All',
+                  () => _showConditionFilter(),
+                ),
+              ),
+            ],
           ),
         ),
         // Listings feed
@@ -439,25 +529,35 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   }
                   final docs = snapshot.data!.docs;
 
-                  // Client-side sort when filters are active
+                  // Determine if any filters are active
                   final hasFilters =
                       (selectedCategory != null && selectedCategory != 'All') ||
                       (selectedSize != null && selectedSize != 'All') ||
                       (selectedCondition != null && selectedCondition != 'All');
 
-                  final sortedDocs = hasFilters
-                      ? (docs.toList()..sort((a, b) {
-                          final ta = (a['timestamp'] as Timestamp?);
-                          final tb = (b['timestamp'] as Timestamp?);
-                          final da = ta?.toDate();
-                          final db = tb?.toDate();
-                          if (da == null && db == null) return 0;
-                          if (da == null) return 1;
-                          if (db == null) return -1;
-                          final cmp = da.compareTo(db);
-                          return (sortBy == 'Newest') ? -cmp : cmp;
-                        }))
-                      : docs;
+                  // Start with a copy
+                  final sortedDocs = docs.toList();
+
+                  // Sort by number of preference matches (descending), then timestamp
+                  sortedDocs.sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+
+                    final aCount = _preferenceMatchCount(aData);
+                    final bCount = _preferenceMatchCount(bData);
+                    if (aCount != bCount)
+                      return bCount.compareTo(aCount); // Descending
+
+                    // Fallback: timestamp sorting
+                    final ta = (aData['timestamp'] as Timestamp?)?.toDate();
+                    final tb = (bData['timestamp'] as Timestamp?)?.toDate();
+                    if (ta == null && tb == null) return 0;
+                    if (ta == null) return 1;
+                    if (tb == null) return -1;
+                    final cmp = ta.compareTo(tb);
+                    return (sortBy == 'Newest') ? -cmp : cmp;
+                  });
+
                   return ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -466,6 +566,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                     itemCount: sortedDocs.length,
                     separatorBuilder: (context, idx) =>
                         const SizedBox(height: 14),
+                    cacheExtent: 1000, // Preload items for smoother scrolling
                     itemBuilder: (context, idx) {
                       final data =
                           sortedDocs[idx].data() as Map<String, dynamic>;
@@ -477,191 +578,116 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  data['imageUrl'],
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: _buildOptimizedImage(
+                                      data['imageUrl'] ?? '',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Expanded(
-                                          child: Text(
-                                            data['title'] ?? '',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyLarge
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        GestureDetector(
-                                          onTap: () =>
-                                              _toggleWishlist(listingId),
-                                          child: Icon(
-                                            wishlistSet.contains(listingId)
-                                                ? Icons.favorite
-                                                : Icons.favorite_border,
-                                            color:
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                data['title'] ?? '',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyLarge
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            GestureDetector(
+                                              onTap: () =>
+                                                  _toggleWishlist(listingId),
+                                              child: Icon(
                                                 wishlistSet.contains(listingId)
-                                                ? AppColors.primary
-                                                : Colors.grey,
-                                            size: 22,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary
-                                                .withOpacity(0.12),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            data['size'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary
-                                                .withOpacity(0.12),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            data['condition'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 6,
-                                      runSpacing: 6,
-                                      children: [
-                                        if ((data['category'] ?? '')
-                                                is String &&
-                                            (data['category'] ?? '').isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary
-                                                  .withOpacity(0.12),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              data['category'],
-                                              style: const TextStyle(
-                                                fontSize: 12,
+                                                    ? Icons.favorite
+                                                    : Icons.favorite_border,
+                                                color:
+                                                    wishlistSet.contains(
+                                                      listingId,
+                                                    )
+                                                    ? AppColors.primary
+                                                    : Colors.grey,
+                                                size: 22,
                                               ),
                                             ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${data['category'] ?? ''} • Size ${data['size'] ?? ''} • ${data['condition'] ?? ''}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey,
                                           ),
-                                        ...((data['tags'] is List)
-                                                ? (data['tags'] as List)
-                                                      .cast<dynamic>()
-                                                : <dynamic>[])
-                                            .take(4) // limit chips in list row
-                                            .map(
-                                              (t) => Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 2,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey.shade200,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  t.toString(),
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) =>
-                                                    ListingDetailsScreen(
-                                                      data: data,
-                                                      listingId: listingId,
-                                                      userId:
-                                                          data['userId'], // FIX: pass the owner, not current user
-                                                    ),
-                                              ),
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: AppColors.primary,
-                                            foregroundColor: Colors.white,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 18,
-                                              vertical: 8,
-                                            ),
-                                            textStyle: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'by @${data['sellerUsername'] ?? 'unknown'}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
                                           ),
-                                          child: const Text('View Details'),
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              ListingDetailsScreen(
+                                                data: data,
+                                                listingId: listingId,
+                                                userId:
+                                                    data['userId'], // FIX: pass the owner, not current user
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 18,
+                                        vertical: 8,
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    child: const Text('SWAP'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -733,6 +759,29 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.grey,
       ),
+
+      // ✅ Only show FAB on the browsing tab
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30), // adjust roundness
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        AddListingScreen(userId: widget.userId),
+                  ),
+                );
+              },
+              child: const Icon(Icons.add, size: 32),
+            )
+          : null,
+
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

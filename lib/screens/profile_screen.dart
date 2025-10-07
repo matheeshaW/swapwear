@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
@@ -15,6 +16,164 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  Future<void> _deleteListing(String listingId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('listings')
+          .doc(listingId)
+          .delete();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Listing deleted')));
+        setState(() {}); // Refresh UI
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+      }
+    }
+  }
+
+  Widget _buildMyListingsSection() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('listings')
+          .where('ownerId', isEqualTo: _uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('You haven’t added any listings yet'),
+          );
+        }
+
+        final docs = snapshot.data!.docs;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'My Listings',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final data = docs[index].data();
+                final listingId = docs[index].id;
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ListTile(
+                    leading:
+                        data['imageUrl'] != null &&
+                            data['imageUrl'].toString().isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CachedNetworkImage(
+                              imageUrl: data['imageUrl'],
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.grey.shade200,
+                                child: const Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.grey,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          )
+                        : const Icon(Icons.image, size: 40),
+                    title: Text(data['title'] ?? 'Untitled'),
+                    subtitle: Text(data['category'] ?? ''),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          tooltip: 'Edit',
+                          onPressed: () {
+                            _showEditListingDialog(context, listingId, data);
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          tooltip: 'Delete',
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Delete Listing'),
+                                content: const Text(
+                                  'Are you sure you want to delete this listing?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              await _deleteListing(listingId);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _photoController = TextEditingController();
@@ -24,13 +183,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
   bool _photoUploading = false;
 
-  late final String _uid;
+  final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
-    _uid = user!.uid;
+
     _loadProfile();
   }
 
@@ -46,7 +204,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = (data['preferences'] as List<dynamic>? ?? [])
           .cast<String>();
       _prefsController.text = prefs.join(', ');
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error loading profile: $e');
+      debugPrint(stack.toString());
       _error = 'Failed to load profile';
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -113,6 +273,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imageQuality: 85,
         maxWidth: 1280,
       );
+      // ...existing code...
+
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
       await _analyzeAndAppend(bytes, picked.name);
@@ -197,6 +359,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
+  }
+
+  Future<void> _showEditListingDialog(
+    BuildContext context,
+    String listingId,
+    Map<String, dynamic> data,
+  ) async {
+    final titleController = TextEditingController(text: data['title'] ?? '');
+    final sizeController = TextEditingController(text: data['size'] ?? '');
+    final conditionController = TextEditingController(
+      text: data['condition'] ?? '',
+    );
+    final categoryController = TextEditingController(
+      text: data['category'] ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: data['description'] ?? '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Listing'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+              ),
+              TextField(
+                controller: sizeController,
+                decoration: const InputDecoration(labelText: 'Size'),
+              ),
+              TextField(
+                controller: conditionController,
+                decoration: const InputDecoration(labelText: 'Condition'),
+              ),
+              TextField(
+                controller: categoryController,
+                decoration: const InputDecoration(labelText: 'Category'),
+              ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await FirebaseFirestore.instance
+                    .collection('listings')
+                    .doc(listingId)
+                    .update({
+                      'title': titleController.text.trim(),
+                      'size': sizeController.text.trim(),
+                      'condition': conditionController.text.trim(),
+                      'category': categoryController.text.trim(),
+                      'description': descriptionController.text.trim(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Listing updated successfully'),
+                    ),
+                  );
+                  setState(() {}); // refresh UI
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -547,6 +802,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         );
                       },
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: _buildMyListingsSection(),
                     ),
                   ],
                 ),

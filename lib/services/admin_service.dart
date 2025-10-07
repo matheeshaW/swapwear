@@ -11,12 +11,25 @@ class AdminService {
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
 
-  Future<bool> isAdmin(String uid) async {
-    // Prefer doc keyed by uid if exists; else query by uid field
+  Future<bool> isAdmin(String uid, {String? email}) async {
+    // 1) Fast path: doc keyed by uid
     final byId = await _admins.doc(uid).get();
     if (byId.exists) return true;
-    final q = await _admins.where('uid', isEqualTo: uid).limit(1).get();
-    return q.docs.isNotEmpty;
+
+    // 2) Fallback: a doc that has uid field
+    final qByUid = await _admins.where('uid', isEqualTo: uid).limit(1).get();
+    if (qByUid.docs.isNotEmpty) return true;
+
+    // 3) Fallback: a doc that has email field
+    if (email != null && email.isNotEmpty) {
+      final qByEmail = await _admins
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      if (qByEmail.docs.isNotEmpty) return true;
+    }
+
+    return false;
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamAllUsers() {
