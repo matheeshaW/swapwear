@@ -8,6 +8,7 @@ import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/add_listing_screen.dart';
 import 'screens/browsing_screen.dart';
+import 'screens/dev_swap_test_screen.dart';
 import 'theme/theme.dart';
 
 Future<void> main() async {
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignUpScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/admin': (context) => const AdminDashboard(),
+        '/dev-swap-test': (context) => const DevSwapTestScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/browse') {

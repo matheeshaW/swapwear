@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import 'my_swaps_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -534,131 +535,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // History Card
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
+                    ListTile(
+                      leading: const Icon(Icons.swap_horiz),
+                      title: const Text('My Swaps'),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MySwapsScreen(),
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Remove duplicated preferences chips here
-                          // const Text(
-                          //   'Swap History',
-                          //   style: TextStyle(
-                          //     fontSize: 18,
-                          //     fontWeight: FontWeight.w700,
-                          //   ),
-                          // ),
-                          // const SizedBox(height: 8),
-                          // StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                          //   stream: FirebaseFirestore.instance
-                          //       .collection('users')
-                          //       .doc(_uid)
-                          //       .snapshots(),
-                          //   builder: (context, snap) {
-                          //     final prefs =
-                          //         ((snap.data?.data()?['preferences']
-                          //                     as List<dynamic>? ??
-                          //                 [])
-                          //             .cast<String>());
-                          //     if (prefs.isEmpty) return const SizedBox.shrink();
-                          //     return Wrap(
-                          //       spacing: 8,
-                          //       runSpacing: 8,
-                          //       children: prefs
-                          //           .map((p) => Chip(label: Text(p)))
-                          //           .toList(),
-                          //     );
-                          //   },
-                          // ),
-                          const Text(
-                            'Swap History',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(_uid)
-                                .snapshots(),
-                            builder: (context, snap) {
-                              final historyIds =
-                                  ((snap.data?.data()?['history']
-                                              as List<dynamic>? ??
-                                          [])
-                                      .cast<String>());
-                              if (historyIds.isEmpty) {
-                                return const Text('No swaps yet');
-                              }
-                              return ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: historyIds.length,
-                                itemBuilder: (context, index) {
-                                  final id = historyIds[index];
-                                  return StreamBuilder<
-                                    DocumentSnapshot<Map<String, dynamic>>
-                                  >(
-                                    stream: FirebaseFirestore.instance
-                                        .collection('swaps')
-                                        .doc(id)
-                                        .snapshots(),
-                                    builder: (context, s) {
-                                      final d = s.data?.data();
-                                      final title = d?['itemName'] ?? id;
-                                      final status = d?['status'] ?? 'unknown';
-                                      final imageUrl =
-                                          d?['imageUrl'] as String?;
-                                      return Container(
-                                        margin: const EdgeInsets.symmetric(
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.grey[200]!,
-                                          ),
-                                        ),
-                                        child: ListTile(
-                                          leading: imageUrl != null
-                                              ? CircleAvatar(
-                                                  backgroundImage: NetworkImage(
-                                                    imageUrl,
-                                                  ),
-                                                )
-                                              : const CircleAvatar(
-                                                  child: Icon(
-                                                    Icons.shopping_bag_outlined,
-                                                  ),
-                                                ),
-                                          title: Text(title.toString()),
-                                          subtitle: Text('Status: $status'),
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ],
                 ),
