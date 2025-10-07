@@ -173,8 +173,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     }
   }
 
-  bool _matchesPreference(Map<String, dynamic> data) {
-    if (_userPreferences.isEmpty) return false;
+  /// Returns the number of preference matches (tags, category, or title)
+  int _preferenceMatchCount(Map<String, dynamic> data) {
+    if (_userPreferences.isEmpty) return 0;
 
     final category = (data['category'] ?? '').toString().toLowerCase();
     final title = (data['title'] ?? '').toString().toLowerCase();
@@ -188,16 +189,13 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       tags = [rawTags.toLowerCase()];
     }
 
-    // Now safely check for matches
+    int count = 0;
     for (final pref in _userPreferences.map((p) => p.toLowerCase())) {
-      if (category.contains(pref) ||
-          title.contains(pref) ||
-          tags.any((t) => t.contains(pref))) {
-        return true;
-      }
+      if (category.contains(pref)) count++;
+      if (title.contains(pref)) count++;
+      count += tags.where((t) => t.contains(pref)).length;
     }
-
-    return false;
+    return count;
   }
 
   Widget _buildOptimizedImage(String imageUrl) {
@@ -540,19 +538,17 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   // Start with a copy
                   final sortedDocs = docs.toList();
 
-                  // Always sort once (includes both preference + timestamp logic)
+                  // Sort by number of preference matches (descending), then timestamp
                   sortedDocs.sort((a, b) {
                     final aData = a.data() as Map<String, dynamic>;
                     final bData = b.data() as Map<String, dynamic>;
 
-                    // 1️⃣ Preference relevance
-                    final aMatch = _matchesPreference(aData);
-                    final bMatch = _matchesPreference(bData);
+                    final aCount = _preferenceMatchCount(aData);
+                    final bCount = _preferenceMatchCount(bData);
+                    if (aCount != bCount)
+                      return bCount.compareTo(aCount); // Descending
 
-                    if (aMatch && !bMatch) return -1;
-                    if (!aMatch && bMatch) return 1;
-
-                    // 2️⃣ Fallback: timestamp sorting
+                    // Fallback: timestamp sorting
                     final ta = (aData['timestamp'] as Timestamp?)?.toDate();
                     final tb = (bData['timestamp'] as Timestamp?)?.toDate();
                     if (ta == null && tb == null) return 0;
