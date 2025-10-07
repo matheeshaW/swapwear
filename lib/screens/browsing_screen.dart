@@ -635,7 +635,8 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                                     ListingDetailsScreen(
                                                       data: data,
                                                       listingId: listingId,
-                                                      userId: widget.userId,
+                                                      userId:
+                                                          data['userId'], // FIX: pass the owner, not current user
                                                     ),
                                               ),
                                             );
