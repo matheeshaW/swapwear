@@ -71,7 +71,19 @@ class _WishlistScreenState extends State<WishlistScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Wishlist')),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Center(
+          child: Text(
+            'My Wishlist',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: getWishlistListings(),
         builder: (context, snapshot) {
