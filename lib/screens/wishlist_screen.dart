@@ -195,7 +195,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                                           _removeFromWishlist(data['id']),
                                       child: const Icon(
                                         Icons.favorite,
-                                        color: AppColors.primary,
+                                        color: Colors.redAccent,
                                         size: 28,
                                       ),
                                     ),
