@@ -779,12 +779,15 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Icon(Icons.swap_horiz, color: AppColors.white),
-            const SizedBox(width: 8),
-            const Text('SwapWear'),
-          ],
+        centerTitle: true,
+        title: SizedBox(
+          height: 40,
+          child: Image.asset(
+            'logo.png',
+            fit: BoxFit.contain,
+            // Provide semantic label for accessibility
+            semanticLabel: 'SwapWear',
+          ),
         ),
       ),
       body: IndexedStack(index: _currentIndex, children: pages),
