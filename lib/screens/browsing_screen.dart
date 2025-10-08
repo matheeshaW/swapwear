@@ -28,6 +28,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   // for wishlist state
   Set<String> wishlist = {};
 
+  // Cache for owner display names to avoid repeated reads
+  final Map<String, String> _ownerNameCache = {};
+
   // Filters and sorting
   String? selectedCategory;
   String? selectedSize;
@@ -529,11 +532,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   }
                   final docs = snapshot.data!.docs;
 
-                  // Determine if any filters are active
-                  final hasFilters =
-                      (selectedCategory != null && selectedCategory != 'All') ||
-                      (selectedSize != null && selectedSize != 'All') ||
-                      (selectedCondition != null && selectedCondition != 'All');
+                  // (filters detection reserved for future use)
 
                   // Start with a copy
                   final sortedDocs = docs.toList();
@@ -640,12 +639,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'by @${data['sellerUsername'] ?? 'unknown'}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
+                                        // Show the listing creator's display name (from users collection)
+                                        _ownerNameWidget(
+                                          data['userId'] ?? data['ownerId'],
                                         ),
                                       ],
                                     ),
@@ -666,7 +662,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                                 data: data,
                                                 listingId: listingId,
                                                 userId:
-                                                    data['userId'], // FIX: pass the owner, not current user
+                                                    data['userId'], // pass the owner id
                                               ),
                                         ),
                                       );
@@ -701,6 +697,48 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _ownerNameWidget(dynamic ownerId) {
+    if (ownerId == null) {
+      return const Text(
+        'by @unknown',
+        style: TextStyle(fontSize: 12, color: Colors.grey),
+      );
+    }
+
+    final id = ownerId.toString();
+    // if cached, return immediately
+    if (_ownerNameCache.containsKey(id)) {
+      return Text(
+        'by @${_ownerNameCache[id]!}',
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
+      );
+    }
+
+    // otherwise, fetch and cache using FutureBuilder
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance.collection('users').doc(id).get(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Text(
+            'by @...',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          );
+        }
+        final data = snap.data?.data();
+        final name =
+            (data?['name'] as String?) ??
+            (data?['username'] as String?) ??
+            'unknown';
+        // cache it
+        _ownerNameCache[id] = name;
+        return Text(
+          'by @${name}',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        );
+      },
     );
   }
 
