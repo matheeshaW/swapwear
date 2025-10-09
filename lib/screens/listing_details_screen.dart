@@ -324,10 +324,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                 ? null
                 : () => _handleRequestSwap(context);
           } else if (status == 'pending') {
-            label = 'Request Sent ✅';
+            label = 'Request Sent';
             enabled = false;
           } else if (status == 'accepted') {
             label = 'Swap Accepted';
+            enabled = false;
+          } else if (status == 'confirmed') {
+            label = 'Swap Confirmed';
             enabled = false;
           } else if (status == 'completed') {
             label = 'Swap Completed';
@@ -388,11 +391,15 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         } else if (status == 'accepted') {
           label = 'Swap Accepted';
           enabled = false;
+        } else if (status == 'confirmed') {
+          label = 'Swap Confirmed';
+          enabled = false;
           // Optional: open chat using swapId as chatId if desired
         } else if (status == 'rejected') {
           label = _isSubmitting ? 'Loading…' : 'Request Swap Again';
           enabled = !_isSubmitting;
           onPressed = _isSubmitting ? null : () => _handleRequestSwap(context);
+          
         } else if (status == 'completed') {
           label = 'Swap Completed';
           enabled = false;
