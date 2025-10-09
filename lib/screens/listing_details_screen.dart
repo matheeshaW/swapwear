@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/swap_service.dart';
@@ -48,7 +49,33 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           children: userListings.map((listing) {
             return SimpleDialogOption(
               onPressed: () => Navigator.pop(context, listing['id'] as String),
-              child: Text(listing['title'] ?? 'Untitled'),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child:
+                        (listing['imageUrl'] != null &&
+                            (listing['imageUrl'] as String).isNotEmpty)
+                        ? Image.network(
+                            listing['imageUrl'],
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            width: 48,
+                            height: 48,
+                            color: Colors.grey.shade200,
+                            child: const Icon(
+                              Icons.image_outlined,
+                              color: Colors.grey,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(listing['title'] ?? 'Untitled')),
+                ],
+              ),
             );
           }).toList(),
         );
@@ -142,7 +169,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .where('fromUserId', isEqualTo: currentUser.uid)
           .where('toUserId', isEqualTo: widget.userId)
           .where('listingRequestedId', isEqualTo: widget.listingId)
-          .where('status', whereIn: ['accepted', 'completed'])
+          .where('status', whereIn: ['accepted', 'confirmed', 'completed'])
           .limit(1)
           .get();
       if (existingAcceptedOrCompleted.docs.isNotEmpty) {
@@ -180,7 +207,17 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Listing Details')),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text(
+          'Listing Details',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -188,11 +225,36 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                widget.data['imageUrl'],
+              child: CachedNetworkImage(
+                imageUrl: widget.data['imageUrl'],
                 height: 220,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  height: 220,
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 220,
+                  color: Colors.grey.shade200,
+                  child: const Icon(
+                    Icons.image_not_supported,
+                    color: Colors.grey,
+                    size: 40,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -298,10 +360,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                 ? null
                 : () => _handleRequestSwap(context);
           } else if (status == 'pending') {
-            label = 'Request Sent ✅';
+            label = 'Request Sent';
             enabled = false;
           } else if (status == 'accepted') {
             label = 'Swap Accepted';
+            enabled = false;
+          } else if (status == 'confirmed') {
+            label = 'Swap Confirmed';
             enabled = false;
           } else if (status == 'completed') {
             label = 'Swap Completed';
@@ -361,6 +426,9 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           enabled = false;
         } else if (status == 'accepted') {
           label = 'Swap Accepted';
+          enabled = false;
+        } else if (status == 'confirmed') {
+          label = 'Swap Confirmed';
           enabled = false;
           // Optional: open chat using swapId as chatId if desired
         } else if (status == 'rejected') {

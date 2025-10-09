@@ -9,6 +9,7 @@ import 'services/notification_service.dart';
 import 'services/achievements_service.dart';
 import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard.dart';
+import 'screens/add_listing_screen.dart';
 import 'screens/browsing_screen.dart';
 import 'screens/dev_swap_test_screen.dart';
 import 'screens/add_provider_page.dart';

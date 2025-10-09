@@ -39,6 +39,10 @@ dependencies:
   cloud_functions: ^5.1.4
   image_picker: ^1.1.2
   firebase_storage: ^12.3.6
+  cloud_functions: ^5.1.4
+  image_picker: ^1.1.2
+  firebase_storage: ^12.3.6
+  cached_network_image: ^3.3.1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -46,6 +50,7 @@ dependencies:
   firebase_messaging: ^15.2.10
   flutter_local_notifications: ^19.4.2
   fl_chart: ^0.69.0
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +74,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # App assets
+  assets:
+    - logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -107,3 +116,18 @@ flutter_icons:
   image_path: "appIcon.png" # fallback
 
   adaptive_icon_foreground: "appIcon.png"
+
+flutter_icons:
+  android: true
+  ios: true
+
+  # Use the same master asset for both
+  image_path_ios: "appIcon.png"
+  image_path_android: "appIcon.png"
+
+  # Android adaptive icon (keeps visual size consistent)
+  adaptive_icon_foreground: "appIcon.png"
+  adaptive_icon_background: "#FFFFFF" # or a brand color, or an image path
+
+  # iOS: strip alpha to comply and avoid odd rendering
+  remove_alpha_ios: true

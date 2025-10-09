@@ -234,7 +234,7 @@ class ConfirmSwapScreen extends StatelessWidget {
                 // Swap items
                 Row(
                   children: [
-                    buildCard(offered, 'YOUR ITEM', const Color(0xFF2D9D78)),
+                    buildCard(requested, 'YOUR ITEM', const Color(0xFF2D9D78)),
                     const SizedBox(width: 14),
                     Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -254,7 +254,7 @@ class ConfirmSwapScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(width: 14),
-                    buildCard(requested, 'THEIR ITEM', const Color(0xFF4ECDC4)),
+                    buildCard(offered, 'THEIR ITEM', const Color(0xFF4ECDC4)),
                   ],
                 ),
                 const SizedBox(height: 32),
