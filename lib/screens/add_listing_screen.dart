@@ -203,7 +203,6 @@ class _AddListingStep1ScreenState extends State<AddListingStep1Screen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Column(
           children: [
@@ -574,7 +573,6 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Column(
           children: [
@@ -590,7 +588,7 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
                         onPressed: () {
                           final w = widget;
                           if (w is _AddListingStep2Proxy) {
-                            (w as _AddListingStep2Proxy).onBackToStep1();
+                            w.onBackToStep1();
                           } else {
                             Navigator.pop(context);
                           }
@@ -860,11 +858,7 @@ extension _Step1WithNext on AddListingStep1Screen {
 
 class _AddListingStep1Proxy extends AddListingStep1Screen {
   final void Function(ListingData) onNext;
-  const _AddListingStep1Proxy({
-    required super.userId,
-    required this.onNext,
-    super.key,
-  });
+  const _AddListingStep1Proxy({required super.userId, required this.onNext});
 
   @override
   State<AddListingStep1Screen> createState() => _AddListingStep1ProxyState();
@@ -911,7 +905,6 @@ class _AddListingStep2Proxy extends AddListingStep2Screen {
     required super.userId,
     required super.listingData,
     required this.onBackToStep1,
-    super.key,
   });
 
   @override

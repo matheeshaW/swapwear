@@ -188,7 +188,17 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Listing Details')),
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text(
+          'Listing Details',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(

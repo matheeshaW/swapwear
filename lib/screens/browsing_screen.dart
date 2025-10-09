@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -24,9 +25,13 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   bool _loading = true;
 
   List<String> _userPreferences = [];
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userPrefSub;
 
   // for wishlist state
   Set<String> wishlist = {};
+
+  // Cache for owner display names to avoid repeated reads
+  final Map<String, String> _ownerNameCache = {};
 
   // Filters and sorting
   String? selectedCategory;
@@ -58,6 +63,35 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     _loadAdmin();
     _loadWishlist();
     _loadUserPreferences();
+    _subscribeToUserPreferences();
+  }
+
+  void _subscribeToUserPreferences() {
+    _userPrefSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.userId)
+        .snapshots()
+        .listen(
+          (doc) {
+            if (!mounted) return;
+            final data = doc.data();
+            final prefs = <String>[];
+            if (data != null && data['preferences'] != null) {
+              try {
+                prefs.addAll(List<String>.from(data['preferences']));
+              } catch (e) {
+                // ignore malformed data
+              }
+            }
+            setState(() {
+              _userPreferences = prefs;
+            });
+            debugPrint('Realtime prefs updated: $_userPreferences');
+          },
+          onError: (e) {
+            debugPrint('User prefs listener error: $e');
+          },
+        );
   }
 
   Future<void> _loadUserPreferences() async {
@@ -136,6 +170,12 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       query = query.orderBy('timestamp', descending: sortBy == 'Newest');
     }
     return query;
+  }
+
+  @override
+  void dispose() {
+    _userPrefSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _toggleWishlist(String listingId) async {
@@ -529,11 +569,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   }
                   final docs = snapshot.data!.docs;
 
-                  // Determine if any filters are active
-                  final hasFilters =
-                      (selectedCategory != null && selectedCategory != 'All') ||
-                      (selectedSize != null && selectedSize != 'All') ||
-                      (selectedCondition != null && selectedCondition != 'All');
+                  // (filters detection reserved for future use)
 
                   // Start with a copy
                   final sortedDocs = docs.toList();
@@ -624,7 +660,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                                     wishlistSet.contains(
                                                       listingId,
                                                     )
-                                                    ? AppColors.primary
+                                                    ? Colors.redAccent
                                                     : Colors.grey,
                                                 size: 22,
                                               ),
@@ -640,12 +676,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'by @${data['sellerUsername'] ?? 'unknown'}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
+                                        // Show the listing creator's display name (from users collection)
+                                        _ownerNameWidget(
+                                          data['userId'] ?? data['ownerId'],
                                         ),
                                       ],
                                     ),
@@ -666,7 +699,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                                                 data: data,
                                                 listingId: listingId,
                                                 userId:
-                                                    data['userId'], // FIX: pass the owner, not current user
+                                                    data['userId'], // pass the owner id
                                               ),
                                         ),
                                       );
@@ -701,6 +734,48 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _ownerNameWidget(dynamic ownerId) {
+    if (ownerId == null) {
+      return const Text(
+        'by @unknown',
+        style: TextStyle(fontSize: 12, color: Colors.grey),
+      );
+    }
+
+    final id = ownerId.toString();
+    // if cached, return immediately
+    if (_ownerNameCache.containsKey(id)) {
+      return Text(
+        'by @${_ownerNameCache[id]!}',
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
+      );
+    }
+
+    // otherwise, fetch and cache using FutureBuilder
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance.collection('users').doc(id).get(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Text(
+            'by @...',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          );
+        }
+        final data = snap.data?.data();
+        final name =
+            (data?['name'] as String?) ??
+            (data?['username'] as String?) ??
+            'unknown';
+        // cache it
+        _ownerNameCache[id] = name;
+        return Text(
+          'by @${name}',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        );
+      },
     );
   }
 
@@ -741,12 +816,15 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Icon(Icons.swap_horiz, color: AppColors.white),
-            const SizedBox(width: 8),
-            const Text('SwapWear'),
-          ],
+        centerTitle: true,
+        title: SizedBox(
+          height: 40,
+          child: Image.asset(
+            'logo.png',
+            fit: BoxFit.contain,
+            // Provide semantic label for accessibility
+            semanticLabel: 'SwapWear',
+          ),
         ),
       ),
       body: IndexedStack(index: _currentIndex, children: pages),
@@ -769,13 +847,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                 borderRadius: BorderRadius.circular(30), // adjust roundness
               ),
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AddListingScreen(userId: widget.userId),
-                  ),
-                );
+                // switch to the Add tab inside the IndexedStack so bottom
+                // navigation remains visible
+                setState(() => _currentIndex = 2);
               },
               child: const Icon(Icons.add, size: 32),
             )
