@@ -49,7 +49,33 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           children: userListings.map((listing) {
             return SimpleDialogOption(
               onPressed: () => Navigator.pop(context, listing['id'] as String),
-              child: Text(listing['title'] ?? 'Untitled'),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child:
+                        (listing['imageUrl'] != null &&
+                            (listing['imageUrl'] as String).isNotEmpty)
+                        ? Image.network(
+                            listing['imageUrl'],
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            width: 48,
+                            height: 48,
+                            color: Colors.grey.shade200,
+                            child: const Icon(
+                              Icons.image_outlined,
+                              color: Colors.grey,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(listing['title'] ?? 'Untitled')),
+                ],
+              ),
             );
           }).toList(),
         );
@@ -419,7 +445,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           label = _isSubmitting ? 'Loading…' : 'Request Swap Again';
           enabled = !_isSubmitting;
           onPressed = _isSubmitting ? null : () => _handleRequestSwap(context);
-          
         } else if (status == 'completed') {
           label = 'Swap Completed';
           enabled = false;
