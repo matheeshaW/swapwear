@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/swap_service.dart';
 
 class DevSwapTestScreen extends StatefulWidget {
-  const DevSwapTestScreen({super.key});
+  const DevSwapTestScreen({Key? key}) : super(key: key);
 
   @override
   State<DevSwapTestScreen> createState() => _DevSwapTestScreenState();

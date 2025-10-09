@@ -206,9 +206,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           fillColor: Colors.grey[50],
                         ),
                         validator: (v) {
-                          if (v == null || v.isEmpty) {
+                          if (v == null || v.isEmpty)
                             return 'Email is required';
-                          }
                           if (!v.contains('@')) return 'Enter a valid email';
                           return null;
                         },
@@ -253,22 +252,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         obscureText: _obscurePassword,
                         validator: (v) {
-                          if (v == null || v.isEmpty) {
+                          if (v == null || v.isEmpty)
                             return 'Password is required';
-                          }
                           if (v.length < 8) return 'Min 8 characters';
-                          if (!RegExp(r'[A-Z]').hasMatch(v)) {
+                          if (!RegExp(r'[A-Z]').hasMatch(v))
                             return 'At least one uppercase letter';
-                          }
-                          if (!RegExp(r'[a-z]').hasMatch(v)) {
+                          if (!RegExp(r'[a-z]').hasMatch(v))
                             return 'At least one lowercase letter';
-                          }
-                          if (!RegExp(r'[0-9]').hasMatch(v)) {
+                          if (!RegExp(r'[0-9]').hasMatch(v))
                             return 'At least one number';
-                          }
-                          if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(v)) {
+                          if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(v))
                             return 'At least one special character';
-                          }
                           return null;
                         },
                       ),
@@ -313,12 +307,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         obscureText: _obscureConfirmPassword,
                         validator: (v) {
-                          if (v == null || v.isEmpty) {
+                          if (v == null || v.isEmpty)
                             return 'Confirm your password';
-                          }
-                          if (v != _passwordController.text) {
+                          if (v != _passwordController.text)
                             return 'Passwords do not match';
-                          }
                           return null;
                         },
                       ),

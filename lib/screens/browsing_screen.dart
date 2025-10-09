@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/colors.dart';
 import 'add_listing_screen.dart';
 import 'wishlist_screen.dart';
 import 'profile_screen.dart';
 import 'admin_dashboard.dart';
+import 'notifications_screen.dart';
 import '../services/admin_service.dart';
+import '../services/notification_service.dart';
 import 'listing_details_screen.dart';
-import '../services/notifications_manager.dart';
 
 class BrowsingScreen extends StatefulWidget {
   final String userId;
@@ -21,6 +23,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   int _currentIndex = 0;
   bool _isAdmin = false;
   bool _loading = true;
+  final NotificationService _notificationService = NotificationService();
 
   // For wishlist state
   Set<String> wishlist = {};
@@ -48,36 +51,34 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     super.initState();
     _loadAdmin();
     _loadWishlist();
+    _createSampleNotifications();
   }
 
   Future<void> _loadAdmin() async {
     try {
       final isAdmin = await AdminService().isAdmin(widget.userId);
-      if (mounted) {
+      if (mounted)
         setState(() {
           _isAdmin = isAdmin;
           _loading = false;
         });
-      }
-    } on FirebaseException {
+    } on FirebaseException catch (e) {
       // Firestore unavailable or other Firebase errors
-      if (mounted) {
+      if (mounted)
         setState(() {
           _isAdmin = false; // fallback
           _loading = false;
         });
-      }
       // Optionally show a snackbar instead of crashing
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(content: Text('Limited functionality offline: ${e.code}')),
       // );
     } catch (_) {
-      if (mounted) {
+      if (mounted)
         setState(() {
           _isAdmin = false;
           _loading = false;
         });
-      }
     }
   }
 
@@ -89,6 +90,25 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     setState(() {
       wishlist = snap.docs.map((d) => d['listingId'] as String).toSet();
     });
+  }
+
+  Future<void> _createSampleNotifications() async {
+    try {
+      // Check if sample notifications already exist
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .collection('notifications')
+          .limit(1)
+          .get();
+
+      // Only create sample notifications if none exist
+      if (snapshot.docs.isEmpty) {
+        await _notificationService.createSampleNotifications(widget.userId);
+      }
+    } catch (e) {
+      print('Error creating sample notifications: $e');
+    }
   }
 
   Stream<Set<String>> get wishlistStream {
@@ -136,12 +156,86 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
       setState(() => wishlist.add(listingId));
+
+      // Create wishlist notification
+      await _notificationService.createNotification(
+        userId: widget.userId,
+        title: '❤️ Added to Wishlist!',
+        message: 'Item has been added to your wishlist.',
+        type: 'Wishlist',
+        tag: '#Wishlist',
+        data: {'listingId': listingId, 'action': 'view_wishlist'},
+      );
     } else {
       for (var doc in query.docs) {
         await doc.reference.delete();
       }
       setState(() => wishlist.remove(listingId));
     }
+  }
+
+  void _showDetailModal(Map<String, dynamic> data) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  data['imageUrl'],
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              data['title'] ?? '',
+              style: Theme.of(context).textTheme.headlineLarge,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Chip(
+                  label: Text('Size:  ${data['size']}'),
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                ),
+                const SizedBox(width: 8),
+                Chip(
+                  label: Text('Condition:  ${data['condition']}'),
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+            if (data['description'] != null)
+              Text(
+                data['description'],
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: null, // Not implemented
+                child: const Text('Request Swap'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBrowseTab() {
@@ -664,43 +758,45 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
         ),
         actions: [
           StreamBuilder<int>(
-            stream: NotificationsManager.instance.unreadNotificationsStream(
-              widget.userId,
-            ),
+            stream: _notificationService.streamUnreadCount(widget.userId),
             builder: (context, snapshot) {
-              final unread = snapshot.data ?? 0;
+              final unreadCount = snapshot.data ?? 0;
               return Stack(
-                clipBehavior: Clip.none,
                 children: [
                   IconButton(
-                    tooltip: 'Notifications',
-                    icon: const Icon(Icons.notifications),
                     onPressed: () {
-                      Navigator.pushNamed(context, '/notifications');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsScreen(),
+                        ),
+                      );
                     },
+                    icon: const Icon(
+                      Icons.notifications_outlined,
+                      color: AppColors.white,
+                    ),
                   ),
-                  if (unread > 0)
+                  if (unreadCount > 0)
                     Positioned(
                       right: 8,
                       top: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
+                        padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
-                          color: Colors.redAccent,
+                          color: Colors.red,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
+                          minWidth: 16,
+                          minHeight: 16,
                         ),
                         child: Text(
-                          unread > 99 ? '99+' : '$unread',
+                          unreadCount > 99 ? '99+' : unreadCount.toString(),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
                         ),

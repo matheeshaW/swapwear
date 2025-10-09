@@ -145,9 +145,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       final listingRequestedId =
                           (swap['listingRequestedId'] ?? '').toString();
                       if (listingOfferedId.isEmpty ||
-                          listingRequestedId.isEmpty) {
+                          listingRequestedId.isEmpty)
                         return;
-                      }
                       if (!context.mounted) return;
                       Navigator.push(
                         context,

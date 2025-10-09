@@ -20,6 +20,7 @@ class ProfileService {
       'name': user.displayName ?? '',
       'email': user.email ?? '',
       'profilePic': user.photoURL,
+      'role': 'customer', // Default role for new users
       'preferences': <String>[],
       'history': <String>[],
       'createdAt': FieldValue.serverTimestamp(),

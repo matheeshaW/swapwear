@@ -220,9 +220,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           fillColor: Colors.grey[50],
                         ),
                         validator: (v) {
-                          if (v == null || v.isEmpty) {
+                          if (v == null || v.isEmpty)
                             return 'Email is required';
-                          }
                           if (!v.contains('@')) return 'Enter a valid email';
                           return null;
                         },
@@ -267,9 +266,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         obscureText: _obscurePassword,
                         validator: (v) {
-                          if (v == null || v.isEmpty) {
+                          if (v == null || v.isEmpty)
                             return 'Password is required';
-                          }
                           if (v.length < 6) return 'Min 6 characters';
                           return null;
                         },

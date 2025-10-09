@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../services/notification_service.dart';
 
 class AddListingScreen extends StatefulWidget {
   final String userId;
@@ -29,6 +30,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   XFile? _imageFile;
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
+  final NotificationService _notificationService = NotificationService();
 
   // pick image from gallery
   Future<void> _pickImage() async {
@@ -84,6 +86,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
             .toList(),
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+      // Create notification for new listing
+      await _notificationService.createNotification(
+        userId: widget.userId,
+        title: '📦 New Listing Added!',
+        message:
+            'Your "${_titleController.text}" has been successfully added to the marketplace.',
+        type: 'Listings',
+        tag: '#NewListing',
+        data: {'action': 'view_listings'},
+      );
 
       // Reset form
       setState(() {
@@ -156,7 +169,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   ),
                   const SizedBox(height: 20),
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedCategory,
+                    value: _selectedCategory,
                     items: _categories
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
@@ -173,7 +186,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   const SizedBox(height: 20),
                   // Size dropdown
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedSize,
+                    value: _selectedSize,
                     items: ['S', 'M', 'L', 'XL']
                         .map(
                           (size) =>
@@ -192,7 +205,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   const SizedBox(height: 20),
                   // Condition dropdown
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedCondition,
+                    value: _selectedCondition,
                     items: ['New', 'Like New', 'Used', 'Worn']
                         .map(
                           (cond) =>

@@ -5,7 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/auth_service.dart';
 import 'my_swaps_screen.dart';
+import 'provider_dashboard.dart';
+import 'achievements_page.dart';
+import 'eco_impact_dashboard.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,8 +27,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _error;
   bool _uploading = false;
   bool _photoUploading = false;
+  String? _userRole;
 
   late final String _uid;
+  final _authService = AuthService();
 
   @override
   void initState() {
@@ -32,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = FirebaseAuth.instance.currentUser;
     _uid = user!.uid;
     _loadProfile();
+    _loadUserRole();
   }
 
   Future<void> _loadProfile() async {
@@ -50,6 +57,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _error = 'Failed to load profile';
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadUserRole() async {
+    try {
+      final role = await _authService.getUserRole(_uid);
+      if (mounted) {
+        setState(() => _userRole = role);
+      }
+    } catch (e) {
+      // Role loading failed, but don't show error as it's not critical
     }
   }
 
@@ -218,7 +236,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _isLoading
                 ? null
                 : () async {
-                    await FirebaseAuth.instance.signOut();
+                    try {
+                      await FirebaseAuth.instance.signOut();
+                      if (mounted) {
+                        Navigator.of(
+                          context,
+                        ).pushNamedAndRemoveUntil('/login', (route) => false);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Logout failed: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
@@ -397,9 +431,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               fillColor: Colors.grey[50],
                             ),
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
+                              if (v == null || v.trim().isEmpty)
                                 return 'Name is required';
-                              }
                               return null;
                             },
                           ),
@@ -549,6 +582,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                     ),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.emoji_events,
+                        color: Color(0xFF10B981),
+                      ),
+                      title: const Text(
+                        'View Achievements',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AchievementsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    // Eco Impact Dashboard Button
+                    ListTile(
+                      leading: const Icon(Icons.eco, color: Color(0xFF10B981)),
+                      title: const Text(
+                        'Eco Impact',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const EcoImpactDashboard(),
+                          ),
+                        );
+                      },
+                    ),
+                    // Provider Dashboard Button (only for providers)
+                    if (_userRole == 'provider') ...[
+                      const SizedBox(height: 8),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.dashboard,
+                          color: Color(0xFF10B981),
+                        ),
+                        title: const Text(
+                          'Provider Dashboard',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProviderDashboard(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),

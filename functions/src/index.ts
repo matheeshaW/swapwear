@@ -2,8 +2,6 @@
 import {ImageAnnotatorClient} from "@google-cloud/vision";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
-import * as admin from "firebase-admin";
 
 setGlobalOptions({region: "us-central1", timeoutSeconds: 60, memory: "512MiB"});
 
@@ -86,47 +84,3 @@ export const analyzeClothing = onCall(async (request) => {
     throw new HttpsError("internal", "Vision API failed");
   }
 });
-
-// Cloud Function to send FCM notifications
-export const sendNotification = onDocumentCreated(
-  "notifications/{notificationId}",
-  async (event) => {
-    const notificationData = event.data?.data();
-    if (!notificationData) {
-      console.error("No notification data found");
-      return;
-    }
-
-    const {tokens, title, body, data} = notificationData;
-
-    if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
-      console.error("No FCM tokens provided");
-      return;
-    }
-
-    try {
-      const message = {
-        notification: {
-          title: title || "SwapWear",
-          body: body || "You have a new notification",
-        },
-        data: data || {},
-        tokens: tokens,
-      };
-
-      const response = await admin.messaging().sendMulticast(message);
-      console.log(`Successfully sent notification to ${response.successCount} devices`);
-      
-      if (response.failureCount > 0) {
-        console.error(`Failed to send to ${response.failureCount} devices`);
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            console.error(`Failed to send to token ${tokens[idx]}: ${resp.error}`);
-          }
-        });
-      }
-    } catch (error) {
-      console.error("Error sending notification:", error);
-    }
-  }
-);

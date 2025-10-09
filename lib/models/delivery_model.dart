@@ -1,120 +1,134 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 
-@immutable
 class DeliveryModel {
   final String? id;
   final String swapId;
-  final String userId;
   final String itemName;
-  final String deliveryLocation;
-  final String
-  status; // "Pending" | "Approved" | "Out for Delivery" | "Completed"
-  final int step; // 1-4 corresponding to status
-  final Timestamp? lastUpdated;
-  final String? trackingNote;
-  final String fromUserId;
-  final String toUserId;
+  final String providerId;
+  final String receiverId;
+  final String status;
+  final String currentLocation;
+  final DateTime? estimatedDelivery;
+  final DateTime? lastUpdated;
+  final String? itemImageUrl;
+  final String? providerName;
+  final String? receiverName;
 
-  const DeliveryModel({
+  DeliveryModel({
     this.id,
     required this.swapId,
-    required this.userId,
     required this.itemName,
-    required this.deliveryLocation,
+    required this.providerId,
+    required this.receiverId,
     required this.status,
-    required this.step,
+    required this.currentLocation,
+    this.estimatedDelivery,
     this.lastUpdated,
-    this.trackingNote,
-    required this.fromUserId,
-    required this.toUserId,
+    this.itemImageUrl,
+    this.providerName,
+    this.receiverName,
   });
 
   factory DeliveryModel.fromMap(Map<String, dynamic> map, String id) {
     return DeliveryModel(
       id: id,
-      swapId: map['swapId'] as String,
-      userId: map['userId'] as String,
-      itemName: map['itemName'] as String,
-      deliveryLocation: map['deliveryLocation'] as String,
-      status: map['status'] as String,
-      step: map['step'] as int,
-      lastUpdated: map['lastUpdated'] as Timestamp?,
-      trackingNote: map['trackingNote'] as String?,
-      fromUserId: map['fromUserId'] as String,
-      toUserId: map['toUserId'] as String,
+      swapId: map['swapId'] ?? '',
+      itemName: map['itemName'] ?? '',
+      providerId: map['providerId'] ?? '',
+      receiverId: map['receiverId'] ?? '',
+      status: map['status'] ?? 'Pending',
+      currentLocation: map['currentLocation'] ?? '',
+      estimatedDelivery: map['estimatedDelivery'] != null
+          ? (map['estimatedDelivery'] as Timestamp).toDate()
+          : null,
+      lastUpdated: map['lastUpdated'] != null
+          ? (map['lastUpdated'] as Timestamp).toDate()
+          : null,
+      itemImageUrl: map['itemImageUrl'],
+      providerName: map['providerName'],
+      receiverName: map['receiverName'],
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'swapId': swapId,
-      'userId': userId,
       'itemName': itemName,
-      'deliveryLocation': deliveryLocation,
+      'providerId': providerId,
+      'receiverId': receiverId,
       'status': status,
-      'step': step,
-      'lastUpdated': lastUpdated,
-      'trackingNote': trackingNote,
-      'fromUserId': fromUserId,
-      'toUserId': toUserId,
+      'currentLocation': currentLocation,
+      'estimatedDelivery': estimatedDelivery != null
+          ? Timestamp.fromDate(estimatedDelivery!)
+          : null,
+      'lastUpdated': lastUpdated != null
+          ? Timestamp.fromDate(lastUpdated!)
+          : FieldValue.serverTimestamp(),
+      'itemImageUrl': itemImageUrl,
+      'providerName': providerName,
+      'receiverName': receiverName,
     };
   }
 
   DeliveryModel copyWith({
     String? id,
     String? swapId,
-    String? userId,
     String? itemName,
-    String? deliveryLocation,
+    String? providerId,
+    String? receiverId,
     String? status,
-    int? step,
-    Timestamp? lastUpdated,
-    String? trackingNote,
-    String? fromUserId,
-    String? toUserId,
+    String? currentLocation,
+    DateTime? estimatedDelivery,
+    DateTime? lastUpdated,
+    String? itemImageUrl,
+    String? providerName,
+    String? receiverName,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
       swapId: swapId ?? this.swapId,
-      userId: userId ?? this.userId,
       itemName: itemName ?? this.itemName,
-      deliveryLocation: deliveryLocation ?? this.deliveryLocation,
+      providerId: providerId ?? this.providerId,
+      receiverId: receiverId ?? this.receiverId,
       status: status ?? this.status,
-      step: step ?? this.step,
+      currentLocation: currentLocation ?? this.currentLocation,
+      estimatedDelivery: estimatedDelivery ?? this.estimatedDelivery,
       lastUpdated: lastUpdated ?? this.lastUpdated,
-      trackingNote: trackingNote ?? this.trackingNote,
-      fromUserId: fromUserId ?? this.fromUserId,
-      toUserId: toUserId ?? this.toUserId,
+      itemImageUrl: itemImageUrl ?? this.itemImageUrl,
+      providerName: providerName ?? this.providerName,
+      receiverName: receiverName ?? this.receiverName,
     );
   }
 
-  // Helper method to get the next status
-  String getNextStatus() {
-    switch (status) {
-      case 'Pending':
-        return 'Approved';
-      case 'Approved':
-        return 'Out for Delivery';
-      case 'Out for Delivery':
-        return 'Completed';
-      default:
-        return status;
+  // Status progression logic
+  static const List<String> statusSteps = [
+    'Pending',
+    'Approved',
+    'Out for Delivery',
+    'Completed',
+  ];
+
+  int get statusStep {
+    return statusSteps.indexOf(status);
+  }
+
+  bool get isCompleted => status == 'Completed';
+  bool get isOutForDelivery => status == 'Out for Delivery';
+  bool get isApproved => status == 'Approved';
+  bool get isPending => status == 'Pending';
+
+  String get nextStatus {
+    final currentIndex = statusSteps.indexOf(status);
+    if (currentIndex < statusSteps.length - 1) {
+      return statusSteps[currentIndex + 1];
     }
+    return status;
   }
 
-  // Helper method to get the next step number
-  int getNextStepNumber() {
-    return step < 4 ? step + 1 : step;
-  }
-
-  // Helper method to check if delivery can be updated
-  bool canUpdateStatus() {
-    return status != 'Completed';
-  }
-
-  @override
-  String toString() {
-    return 'DeliveryModel(id: $id, swapId: $swapId, userId: $userId, itemName: $itemName, deliveryLocation: $deliveryLocation, status: $status, step: $step, lastUpdated: $lastUpdated, trackingNote: $trackingNote, fromUserId: $fromUserId, toUserId: $toUserId)';
+  bool canUpdateTo(String newStatus) {
+    final currentIndex = statusSteps.indexOf(status);
+    final newIndex = statusSteps.indexOf(newStatus);
+    return newIndex > currentIndex && newIndex <= currentIndex + 1;
   }
 }
+
