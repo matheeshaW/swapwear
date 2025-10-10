@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/admin_service.dart';
-import 'user_management_dialog.dart';
 import 'user_management_screen.dart';
 import 'user_management_utils.dart';
+import '../theme/colors.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -157,11 +157,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 52,
+                height: 56,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                    colors: [
+                      AppColors.primary,
+                      Color.fromARGB(255, 3, 117, 148),
+                    ],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -183,28 +186,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    minimumSize: const Size.fromHeight(52),
+                    minimumSize: const Size.fromHeight(56),
                   ),
-                  onPressed: () async {
-                    await UserManagementDialog.show(context);
-                  },
-                ),
-              ),
-              Container(
-                height: 52,
-                margin: const EdgeInsets.only(bottom: 8),
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF667eea),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: const BorderSide(color: Color(0xFF667eea)),
-                    minimumSize: const Size.fromHeight(52),
-                  ),
-                  icon: const Icon(Icons.open_in_full),
-                  label: const Text('Open in Full Screen'),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -216,11 +199,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
               Container(
-                height: 52,
+                height: 56,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF764ba2), Color(0xFF667eea)],
+                    colors: [
+                      AppColors.primary,
+                      Color.fromARGB(255, 3, 117, 148),
+                    ],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -245,7 +231,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    minimumSize: const Size.fromHeight(52),
+                    minimumSize: const Size.fromHeight(56),
                   ),
                   onPressed: _addAdminDialog,
                 ),
