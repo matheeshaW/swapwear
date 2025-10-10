@@ -597,15 +597,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           CircleAvatar(
                                             radius: 56,
                                             backgroundColor: Colors.grey[100],
-                                            backgroundImage: (pic.isNotEmpty)
-                                                ? NetworkImage(pic)
-                                                : null,
-                                            child: (pic.isEmpty)
-                                                ? const Icon(
+                                            backgroundImage:
+                                                null, // Remove NetworkImage
+                                            child: (pic.isNotEmpty)
+                                                ? ClipOval(
+                                                    child: CachedNetworkImage(
+                                                      imageUrl: pic,
+                                                      width: 112,
+                                                      height: 112,
+                                                      fit: BoxFit.cover,
+                                                      placeholder:
+                                                          (
+                                                            context,
+                                                            url,
+                                                          ) => Container(
+                                                            width: 112,
+                                                            height: 112,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade200,
+                                                            child: const Center(
+                                                              child: SizedBox(
+                                                                width: 24,
+                                                                height: 24,
+                                                                child:
+                                                                    CircularProgressIndicator(
+                                                                      strokeWidth:
+                                                                          2,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                      errorWidget:
+                                                          (
+                                                            context,
+                                                            url,
+                                                            error,
+                                                          ) => Container(
+                                                            width: 112,
+                                                            height: 112,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade200,
+                                                            child: const Icon(
+                                                              Icons.person,
+                                                              size: 56,
+                                                              color:
+                                                                  Colors.grey,
+                                                            ),
+                                                          ),
+                                                    ),
+                                                  )
+                                                : const Icon(
                                                     Icons.person,
                                                     size: 56,
-                                                  )
-                                                : null,
+                                                  ),
                                           ),
                                           Positioned(
                                             right: -6,
