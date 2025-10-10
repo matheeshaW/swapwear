@@ -35,18 +35,7 @@ class UserStatsModel {
       co2Saved: (map['co2Saved'] ?? 0).toDouble(),
       waterSaved: (map['waterSaved'] ?? 0).toDouble(),
       itemsRecycled: map['itemsRecycled'] ?? 0,
-      monthlyStats: Map<String, Map<String, double>>.from(
-        (map['monthlyStats'] ?? {}).map(
-          (key, value) => MapEntry(
-            key,
-            Map<String, double>.from(
-              (value as Map).map(
-                (k, v) => MapEntry(k.toString(), v.toDouble()),
-              ),
-            ),
-          ),
-        ),
-      ),
+      monthlyStats: _parseMonthlyStats(map['monthlyStats']),
     );
   }
 
@@ -85,5 +74,35 @@ class UserStatsModel {
       itemsRecycled: itemsRecycled ?? this.itemsRecycled,
       monthlyStats: monthlyStats ?? this.monthlyStats,
     );
+  }
+
+  static Map<String, Map<String, double>> _parseMonthlyStats(
+    dynamic monthlyStatsData,
+  ) {
+    if (monthlyStatsData == null) return {};
+
+    try {
+      if (monthlyStatsData is Map) {
+        return Map<String, Map<String, double>>.from(
+          monthlyStatsData.map((key, value) {
+            if (value is Map) {
+              return MapEntry(
+                key.toString(),
+                Map<String, double>.from(
+                  value.map((k, v) => MapEntry(k.toString(), v.toDouble())),
+                ),
+              );
+            } else {
+              // If value is not a Map, return empty map for this key
+              return MapEntry(key.toString(), <String, double>{});
+            }
+          }),
+        );
+      }
+    } catch (e) {
+      print('Error parsing monthly stats: $e');
+    }
+
+    return {};
   }
 }

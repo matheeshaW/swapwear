@@ -14,6 +14,19 @@ class DeliveryModel {
   final String? providerName;
   final String? receiverName;
 
+  // Enhanced location and tracking data
+  final double? pickupLatitude;
+  final double? pickupLongitude;
+  final double? deliveryLatitude;
+  final double? deliveryLongitude;
+  final String? pickupAddress;
+  final String? deliveryAddress;
+  final double? distanceKm;
+  final double? co2SavedKg;
+  final String? routePolyline;
+  final DateTime? pickedUpAt;
+  final DateTime? deliveredAt;
+
   DeliveryModel({
     this.id,
     required this.swapId,
@@ -27,6 +40,17 @@ class DeliveryModel {
     this.itemImageUrl,
     this.providerName,
     this.receiverName,
+    this.pickupLatitude,
+    this.pickupLongitude,
+    this.deliveryLatitude,
+    this.deliveryLongitude,
+    this.pickupAddress,
+    this.deliveryAddress,
+    this.distanceKm,
+    this.co2SavedKg,
+    this.routePolyline,
+    this.pickedUpAt,
+    this.deliveredAt,
   });
 
   factory DeliveryModel.fromMap(Map<String, dynamic> map, String id) {
@@ -47,6 +71,21 @@ class DeliveryModel {
       itemImageUrl: map['itemImageUrl'],
       providerName: map['providerName'],
       receiverName: map['receiverName'],
+      pickupLatitude: map['pickupLatitude']?.toDouble(),
+      pickupLongitude: map['pickupLongitude']?.toDouble(),
+      deliveryLatitude: map['deliveryLatitude']?.toDouble(),
+      deliveryLongitude: map['deliveryLongitude']?.toDouble(),
+      pickupAddress: map['pickupAddress'],
+      deliveryAddress: map['deliveryAddress'],
+      distanceKm: map['distanceKm']?.toDouble(),
+      co2SavedKg: map['co2SavedKg']?.toDouble(),
+      routePolyline: map['routePolyline'],
+      pickedUpAt: map['pickedUpAt'] != null
+          ? (map['pickedUpAt'] as Timestamp).toDate()
+          : null,
+      deliveredAt: map['deliveredAt'] != null
+          ? (map['deliveredAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -67,6 +106,19 @@ class DeliveryModel {
       'itemImageUrl': itemImageUrl,
       'providerName': providerName,
       'receiverName': receiverName,
+      'pickupLatitude': pickupLatitude,
+      'pickupLongitude': pickupLongitude,
+      'deliveryLatitude': deliveryLatitude,
+      'deliveryLongitude': deliveryLongitude,
+      'pickupAddress': pickupAddress,
+      'deliveryAddress': deliveryAddress,
+      'distanceKm': distanceKm,
+      'co2SavedKg': co2SavedKg,
+      'routePolyline': routePolyline,
+      'pickedUpAt': pickedUpAt != null ? Timestamp.fromDate(pickedUpAt!) : null,
+      'deliveredAt': deliveredAt != null
+          ? Timestamp.fromDate(deliveredAt!)
+          : null,
     };
   }
 
@@ -83,6 +135,17 @@ class DeliveryModel {
     String? itemImageUrl,
     String? providerName,
     String? receiverName,
+    double? pickupLatitude,
+    double? pickupLongitude,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
+    String? pickupAddress,
+    String? deliveryAddress,
+    double? distanceKm,
+    double? co2SavedKg,
+    String? routePolyline,
+    DateTime? pickedUpAt,
+    DateTime? deliveredAt,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
@@ -97,6 +160,17 @@ class DeliveryModel {
       itemImageUrl: itemImageUrl ?? this.itemImageUrl,
       providerName: providerName ?? this.providerName,
       receiverName: receiverName ?? this.receiverName,
+      pickupLatitude: pickupLatitude ?? this.pickupLatitude,
+      pickupLongitude: pickupLongitude ?? this.pickupLongitude,
+      deliveryLatitude: deliveryLatitude ?? this.deliveryLatitude,
+      deliveryLongitude: deliveryLongitude ?? this.deliveryLongitude,
+      pickupAddress: pickupAddress ?? this.pickupAddress,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      distanceKm: distanceKm ?? this.distanceKm,
+      co2SavedKg: co2SavedKg ?? this.co2SavedKg,
+      routePolyline: routePolyline ?? this.routePolyline,
+      pickedUpAt: pickedUpAt ?? this.pickedUpAt,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
     );
   }
 
@@ -104,16 +178,18 @@ class DeliveryModel {
   static const List<String> statusSteps = [
     'Pending',
     'Approved',
-    'Out for Delivery',
-    'Completed',
+    'Picked Up',
+    'In Transit',
+    'Delivered',
   ];
 
   int get statusStep {
     return statusSteps.indexOf(status);
   }
 
-  bool get isCompleted => status == 'Completed';
-  bool get isOutForDelivery => status == 'Out for Delivery';
+  bool get isCompleted => status == 'Delivered';
+  bool get isInTransit => status == 'In Transit';
+  bool get isPickedUp => status == 'Picked Up';
   bool get isApproved => status == 'Approved';
   bool get isPending => status == 'Pending';
 
@@ -131,4 +207,3 @@ class DeliveryModel {
     return newIndex > currentIndex && newIndex <= currentIndex + 1;
   }
 }
-

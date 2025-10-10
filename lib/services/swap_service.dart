@@ -187,13 +187,14 @@ class SwapService {
             .doc(swapData['toUserId'])
             .get();
 
-        // Create delivery record
+        // Create delivery record with basic location data
+        // Location data will be updated when user selects delivery location
         await _deliveryService.createDelivery(
           swapId: swapId,
           itemName: offeredData['title'] ?? 'Unknown Item',
           providerId: swapData['fromUserId'],
           receiverId: swapData['toUserId'],
-          currentLocation: 'Colombo, Sri Lanka', // Default location
+          currentLocation: 'Location to be selected',
           estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
           itemImageUrl: offeredData['imageUrl'],
           providerName: providerDoc.data()?['name'] ?? 'Provider',

@@ -89,6 +89,8 @@ class NotificationModel {
         return '📦';
       case 'Wishlist':
         return '❤️';
+      case 'Chat':
+        return '💬';
       case 'Login':
         return '🔐';
       case 'System':
@@ -111,6 +113,8 @@ class NotificationModel {
         return '#8B5CF6'; // Purple
       case 'Wishlist':
         return '#EC4899'; // Pink
+      case 'Chat':
+        return '#10B981'; // Green
       case 'Login':
         return '#06B6D4'; // Cyan
       case 'System':

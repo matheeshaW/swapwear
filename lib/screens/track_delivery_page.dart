@@ -263,7 +263,7 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Location: ${delivery.currentLocation}',
+                            'Location: ${delivery.deliveryAddress ?? delivery.currentLocation}',
                             style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFF6B7280),
@@ -327,6 +327,7 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
                     isCompleted: isCompleted,
                     isCurrent: isCurrent,
                     isLast: index == DeliveryModel.statusSteps.length - 1,
+                    delivery: delivery,
                   );
                 }).toList(),
               ],
@@ -382,6 +383,7 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
     required bool isCompleted,
     required bool isCurrent,
     required bool isLast,
+    required DeliveryModel delivery,
   }) {
     Color getStatusColor() {
       if (isCompleted) return const Color(0xFF10B981);
@@ -464,7 +466,7 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
                 if (isCurrent) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Currently in progress',
+                    'Delivered to ${delivery.deliveryAddress ?? delivery.currentLocation}',
                     style: TextStyle(
                       fontSize: 14,
                       color: getStatusColor(),

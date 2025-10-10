@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/swap_service.dart';
+import '../services/delivery_service.dart';
+import 'location_picker_screen.dart';
 
-class ConfirmSwapScreen extends StatelessWidget {
+class ConfirmSwapScreen extends StatefulWidget {
   final String swapId;
   final String listingOfferedId;
   final String listingRequestedId;
@@ -14,12 +16,71 @@ class ConfirmSwapScreen extends StatelessWidget {
     required this.listingRequestedId,
   });
 
+  @override
+  State<ConfirmSwapScreen> createState() => _ConfirmSwapScreenState();
+}
+
+class _ConfirmSwapScreenState extends State<ConfirmSwapScreen> {
+  bool _hasDeliveryLocation = false;
+  String? _deliveryAddress;
+
   Future<Map<String, dynamic>?> _getListing(String id) async {
     final doc = await FirebaseFirestore.instance
         .collection('listings')
         .doc(id)
         .get();
     return doc.data();
+  }
+
+  Future<void> _selectDeliveryLocation(
+    Map<String, dynamic> offeredListing,
+  ) async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LocationPickerScreen(
+          swapId: widget.swapId,
+          itemName: offeredListing['title'] ?? 'Item',
+          providerName: offeredListing['userName'] ?? 'Provider',
+          receiverName: 'You', // Current user
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _hasDeliveryLocation = true;
+        _deliveryAddress = result['address'];
+      });
+    }
+  }
+
+  Future<void> _confirmSwap() async {
+    try {
+      // Confirm the swap first
+      await SwapService().confirmSwap(widget.swapId);
+
+      // Update delivery with location data if available
+      if (_hasDeliveryLocation && _deliveryAddress != null) {
+        await DeliveryService().updateDeliveryLocation(
+          swapId: widget.swapId,
+          deliveryAddress: _deliveryAddress!,
+        );
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error confirming swap: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -41,8 +102,8 @@ class ConfirmSwapScreen extends StatelessWidget {
       ),
       body: FutureBuilder<List<Map<String, dynamic>?>>(
         future: Future.wait([
-          _getListing(listingOfferedId),
-          _getListing(listingRequestedId),
+          _getListing(widget.listingOfferedId),
+          _getListing(widget.listingRequestedId),
         ]),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -284,14 +345,126 @@ class ConfirmSwapScreen extends StatelessWidget {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
+
+                      // Delivery Location Section
+                      if (!_hasDeliveryLocation) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5F1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF2D9D78).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    color: const Color(0xFF2D9D78),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Add Delivery Location',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1A5C4A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Select where you\'d like to meet for the swap',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () =>
+                                      _selectDeliveryLocation(offered),
+                                  icon: const Icon(Icons.map, size: 18),
+                                  label: const Text('Choose Location'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2D9D78),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5F1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF10B981)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                color: Color(0xFF10B981),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Delivery Location Set',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF065F46),
+                                      ),
+                                    ),
+                                    Text(
+                                      _deliveryAddress ?? '',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF6B7280),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    _selectDeliveryLocation(offered),
+                                child: const Text('Change'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
                       Row(
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () async {
-                                await SwapService().confirmSwap(swapId);
-                                if (context.mounted) Navigator.pop(context);
-                              },
+                              onPressed: _hasDeliveryLocation
+                                  ? _confirmSwap
+                                  : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2D9D78),
                                 foregroundColor: Colors.white,
@@ -306,14 +479,21 @@ class ConfirmSwapScreen extends StatelessWidget {
                                   0xFF2D9D78,
                                 ).withOpacity(0.4),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.check_circle_outline, size: 20),
-                                  SizedBox(width: 8),
+                                  Icon(
+                                    _hasDeliveryLocation
+                                        ? Icons.check_circle_outline
+                                        : Icons.location_off,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    'Confirm Swap',
-                                    style: TextStyle(
+                                    _hasDeliveryLocation
+                                        ? 'Confirm Swap'
+                                        : 'Add Location First',
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                     ),

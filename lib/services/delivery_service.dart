@@ -23,6 +23,15 @@ class DeliveryService {
     String? itemImageUrl,
     String? providerName,
     String? receiverName,
+    double? pickupLatitude,
+    double? pickupLongitude,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
+    String? pickupAddress,
+    String? deliveryAddress,
+    double? distanceKm,
+    double? co2SavedKg,
+    String? routePolyline,
   }) async {
     try {
       final delivery = DeliveryModel(
@@ -36,6 +45,15 @@ class DeliveryService {
         itemImageUrl: itemImageUrl,
         providerName: providerName,
         receiverName: receiverName,
+        pickupLatitude: pickupLatitude,
+        pickupLongitude: pickupLongitude,
+        deliveryLatitude: deliveryLatitude,
+        deliveryLongitude: deliveryLongitude,
+        pickupAddress: pickupAddress,
+        deliveryAddress: deliveryAddress,
+        distanceKm: distanceKm,
+        co2SavedKg: co2SavedKg,
+        routePolyline: routePolyline,
       );
 
       final docRef = await _deliveries.add(delivery.toMap());
@@ -105,6 +123,29 @@ class DeliveryService {
         });
   }
 
+  // Update delivery location
+  Future<void> updateDeliveryLocation({
+    required String swapId,
+    required String deliveryAddress,
+  }) async {
+    try {
+      final query = await _deliveries
+          .where('swapId', isEqualTo: swapId)
+          .limit(1)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        await _deliveries.doc(query.docs.first.id).update({
+          'deliveryAddress': deliveryAddress,
+          'currentLocation': deliveryAddress,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      throw Exception('Failed to update delivery location: $e');
+    }
+  }
+
   // Stream deliveries for provider
   Stream<List<DeliveryModel>> streamProviderDeliveries(String providerId) {
     return _deliveries
@@ -160,6 +201,66 @@ class DeliveryService {
       }
 
       await _deliveries.doc(deliveryId).update(updateData);
+
+      // Send notification for delivery status update
+      final deliveryDoc = await _deliveries.doc(deliveryId).get();
+      if (deliveryDoc.exists) {
+        final deliveryData = deliveryDoc.data()!;
+        final providerId = deliveryData['providerId'] as String?;
+        final receiverId = deliveryData['receiverId'] as String?;
+        final itemName = deliveryData['itemName'] as String?;
+
+        String title;
+        String message;
+        String tag;
+
+        switch (newStatus) {
+          case 'Approved':
+            title = 'Delivery Approved';
+            message =
+                'Your delivery for $itemName has been approved and is being prepared.';
+            tag = '#Approved';
+            break;
+          case 'Out for Delivery':
+            title = 'Out for Delivery';
+            message = 'Your item $itemName is now out for delivery!';
+            tag = '#OutForDelivery';
+            break;
+          case 'Completed':
+            title = 'Delivery Completed';
+            message =
+                'Your delivery for $itemName has been completed successfully!';
+            tag = '#Completed';
+            break;
+          default:
+            title = 'Delivery Update';
+            message = 'Your delivery status has been updated to $newStatus.';
+            tag = '#Updated';
+        }
+
+        // Notify both provider and receiver
+        if (providerId != null) {
+          await _notificationService.createNotification(
+            userId: providerId,
+            title: title,
+            message: message,
+            type: 'Deliveries',
+            tag: tag,
+            data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+          );
+        }
+
+        if (receiverId != null) {
+          await _notificationService.createNotification(
+            userId: receiverId,
+            title: title,
+            message: message,
+            type: 'Deliveries',
+            tag: tag,
+            data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+          );
+        }
+      }
     } catch (e) {
       throw Exception('Failed to update delivery status: $e');
     }
@@ -185,6 +286,68 @@ class DeliveryService {
       }
 
       await _deliveries.doc(deliveryId).update(updateData);
+
+      // Send notification for delivery status update
+      if (status != null) {
+        final deliveryDoc = await _deliveries.doc(deliveryId).get();
+        if (deliveryDoc.exists) {
+          final deliveryData = deliveryDoc.data()!;
+          final providerId = deliveryData['providerId'] as String?;
+          final receiverId = deliveryData['receiverId'] as String?;
+          final itemName = deliveryData['itemName'] as String?;
+
+          String title;
+          String message;
+          String tag;
+
+          switch (status) {
+            case 'Approved':
+              title = 'Delivery Approved';
+              message =
+                  'Your delivery for $itemName has been approved and is being prepared.';
+              tag = '#Approved';
+              break;
+            case 'Out for Delivery':
+              title = 'Out for Delivery';
+              message = 'Your item $itemName is now out for delivery!';
+              tag = '#OutForDelivery';
+              break;
+            case 'Completed':
+              title = 'Delivery Completed';
+              message =
+                  'Your delivery for $itemName has been completed successfully!';
+              tag = '#Completed';
+              break;
+            default:
+              title = 'Delivery Update';
+              message = 'Your delivery status has been updated to $status.';
+              tag = '#Updated';
+          }
+
+          // Notify both provider and receiver
+          if (providerId != null) {
+            await _notificationService.createNotification(
+              userId: providerId,
+              title: title,
+              message: message,
+              type: 'Deliveries',
+              tag: tag,
+              data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+            );
+          }
+
+          if (receiverId != null) {
+            await _notificationService.createNotification(
+              userId: receiverId,
+              title: title,
+              message: message,
+              type: 'Deliveries',
+              tag: tag,
+              data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+            );
+          }
+        }
+      }
     } catch (e) {
       throw Exception('Failed to update delivery: $e');
     }

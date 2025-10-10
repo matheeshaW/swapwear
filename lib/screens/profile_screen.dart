@@ -909,7 +909,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: Color(0xFF10B981),
                         ),
                         title: const Text(
-                          'Provider Dashboard',
+                          'Manage deliveries',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF10B981),

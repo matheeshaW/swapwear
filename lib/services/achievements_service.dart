@@ -88,6 +88,25 @@ class AchievementsService {
           'itemsRecycled': 0,
           'monthlyStats': {},
         });
+        print('User stats initialized for $userId');
+      } else {
+        // Check if the document has all required fields
+        final data = doc.data()!;
+        final needsUpdate =
+            !data.containsKey('co2Saved') ||
+            !data.containsKey('waterSaved') ||
+            !data.containsKey('itemsRecycled') ||
+            !data.containsKey('monthlyStats');
+
+        if (needsUpdate) {
+          print('Updating user stats with missing fields for $userId');
+          await _db.collection('userStats').doc(userId).update({
+            'co2Saved': data['co2Saved'] ?? 0.0,
+            'waterSaved': data['waterSaved'] ?? 0.0,
+            'itemsRecycled': data['itemsRecycled'] ?? 0,
+            'monthlyStats': data['monthlyStats'] ?? {},
+          });
+        }
       }
     } catch (e) {
       print('Error initializing user stats: $e');

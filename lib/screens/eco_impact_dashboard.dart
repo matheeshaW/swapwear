@@ -59,6 +59,7 @@ class _EcoImpactDashboardState extends State<EcoImpactDashboard>
             fontSize: 20,
           ),
         ),
+        actions: [],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(

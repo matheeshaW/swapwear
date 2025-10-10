@@ -14,6 +14,7 @@ import 'screens/dev_swap_test_screen.dart';
 import 'screens/add_provider_page.dart';
 import 'screens/provider_dashboard.dart';
 import 'screens/track_delivery_page.dart';
+import 'screens/enhanced_track_delivery_page.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/eco_impact_dashboard.dart';
 import 'screens/achievements_page.dart';
@@ -57,6 +58,12 @@ class MyApp extends StatelessWidget {
               ModalRoute.of(context)?.settings.arguments
                   as Map<String, dynamic>?;
           return TrackDeliveryPage(swapId: args?['swapId'] ?? '');
+        },
+        '/enhanced-track-delivery': (context) {
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+          return EnhancedTrackDeliveryPage(swapId: args?['swapId'] ?? '');
         },
         '/dev-swap-test': (context) => const DevSwapTestScreen(),
       },

@@ -189,12 +189,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           return _buildEmptyState('Other');
         }
 
-        // Filter notifications for other types (Listings, Wishlist, Login, System)
+        // Filter notifications for other types (Listings, Wishlist, Login, System, Chat)
         final allNotifications = snapshot.data!;
         final notifications = allNotifications
             .where(
-              (n) =>
-                  ['Listings', 'Wishlist', 'Login', 'System'].contains(n.type),
+              (n) => [
+                'Listings',
+                'Wishlist',
+                'Login',
+                'System',
+                'Chat',
+              ].contains(n.type),
             )
             .toList();
 

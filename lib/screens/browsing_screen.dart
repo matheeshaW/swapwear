@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/colors.dart';
+import '../services/notification_service.dart';
 import 'add_listing_screen.dart';
 import 'wishlist_screen.dart';
 import 'profile_screen.dart';
@@ -58,7 +59,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       uid == widget.userId,
       'UID mismatch: auth=$uid param=${widget.userId}',
     );
-    _loadAdmin();
+    _loadUserRole();
     _loadWishlist();
     _loadUserPreferences();
     _subscribeToUserPreferences();
@@ -109,17 +110,19 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     }
   }
 
-  Future<void> _loadAdmin() async {
+  Future<void> _loadUserRole() async {
     try {
-      final isAdmin = await AdminService().isAdmin(widget.userId);
-      debugPrint('Admin check for ${widget.userId}: $isAdmin');
+      final adminService = AdminService();
+      final isAdmin = await adminService.isAdmin(widget.userId);
+
+      debugPrint('Role check for ${widget.userId}: admin=$isAdmin');
       if (mounted)
         setState(() {
           _isAdmin = isAdmin;
           _loading = false;
         });
     } catch (e) {
-      debugPrint('Admin check failed: $e');
+      debugPrint('Role check failed: $e');
       if (mounted)
         setState(() {
           _isAdmin = false;
@@ -202,6 +205,18 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
           wishlist.add(listingId);
         }
       });
+
+      // Create notification for wishlist action
+      final notificationService = NotificationService();
+      if (wishlist.contains(listingId)) {
+        await notificationService.createNotification(
+          userId: widget.userId,
+          title: 'Item Added to Wishlist',
+          message: 'You added an item to your wishlist!',
+          type: 'Wishlist',
+          tag: '#Wishlist',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -786,7 +801,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       WishlistScreen(userId: widget.userId),
       AddListingScreen(userId: widget.userId),
       ProfileScreen(),
-      if (_isAdmin) AdminDashboard(),
+      if (_isAdmin) const AdminDashboard(),
     ];
 
     final items = <BottomNavigationBarItem>[
@@ -823,10 +838,45 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              Navigator.pushNamed(context, '/notifications');
+          StreamBuilder<int>(
+            stream: NotificationService().streamUnreadCount(widget.userId),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/notifications');
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
             },
           ),
         ],
