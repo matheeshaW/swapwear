@@ -11,6 +11,7 @@ import 'my_swaps_screen.dart';
 import 'provider_dashboard.dart';
 import 'eco_impact_dashboard.dart';
 import 'achievements_page.dart';
+import '../theme/colors.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -498,11 +499,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : () async {
                     try {
                       await FirebaseAuth.instance.signOut();
-                      if (mounted) {
+                      if (!mounted) return;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
                         Navigator.of(
                           context,
                         ).pushNamedAndRemoveUntil('/login', (route) => false);
-                      }
+                      });
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -801,7 +803,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             height: 52,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                colors: [
+                                  AppColors.primary,
+                                  Color.fromARGB(255, 3, 117, 148),
+                                ],
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
                               ),
