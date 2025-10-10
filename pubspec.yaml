@@ -39,9 +39,6 @@ dependencies:
   cloud_functions: ^5.1.4
   image_picker: ^1.1.2
   firebase_storage: ^12.3.6
-  cloud_functions: ^5.1.4
-  image_picker: ^1.1.2
-  firebase_storage: ^12.3.6
   cached_network_image: ^3.3.1
 
   # The following adds the Cupertino Icons font to your application.
@@ -62,8 +59,6 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
-
-  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -109,13 +104,6 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-flutter_icons:
-  android: true
-  ios: true
-  image_path: "appIcon.png" # fallback
-
-  adaptive_icon_foreground: "appIcon.png"
 
 flutter_icons:
   android: true

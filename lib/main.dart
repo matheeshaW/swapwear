@@ -9,13 +9,14 @@ import 'services/notification_service.dart';
 import 'services/achievements_service.dart';
 import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard.dart';
-import 'screens/add_listing_screen.dart';
 import 'screens/browsing_screen.dart';
 import 'screens/dev_swap_test_screen.dart';
 import 'screens/add_provider_page.dart';
 import 'screens/provider_dashboard.dart';
 import 'screens/track_delivery_page.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/eco_impact_dashboard.dart';
+import 'screens/achievements_page.dart';
 import 'theme/theme.dart';
 
 Future<void> main() async {
@@ -49,6 +50,8 @@ class MyApp extends StatelessWidget {
         '/add-provider': (context) => const AddProviderPage(),
         '/provider-dashboard': (context) => const ProviderDashboard(),
         '/notifications': (context) => const NotificationsScreen(),
+        '/eco-impact': (context) => const EcoImpactDashboard(),
+        '/achievements': (context) => const AchievementsPage(),
         '/track-delivery': (context) {
           final args =
               ModalRoute.of(context)?.settings.arguments

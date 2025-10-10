@@ -477,13 +477,6 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       ),
     );
   }
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildBrowseTab() {
     return Column(
@@ -781,6 +774,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -828,6 +822,14 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
             semanticLabel: 'SwapWear',
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              Navigator.pushNamed(context, '/notifications');
+            },
+          ),
+        ],
       ),
       body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(

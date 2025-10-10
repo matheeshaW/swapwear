@@ -144,6 +144,54 @@ class _EcoImpactDashboardState extends State<EcoImpactDashboard>
           StreamBuilder<UserStatsModel?>(
             stream: _achievementsService.streamUserStats(userId),
             builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Row(
+                  children: [
+                    Text(
+                      '0.0',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'kg CO₂',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              if (snapshot.hasError) {
+                return const Row(
+                  children: [
+                    Text(
+                      '0.0',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'kg CO₂',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                );
+              }
+
               final userStats = snapshot.data;
               final co2Saved = userStats?.co2Saved ?? 0.0;
 
@@ -181,6 +229,14 @@ class _EcoImpactDashboardState extends State<EcoImpactDashboard>
     return StreamBuilder<UserStatsModel?>(
       stream: _achievementsService.streamUserStats(userId),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingCards();
+        }
+
+        if (snapshot.hasError) {
+          return _buildErrorCards();
+        }
+
         final userStats = snapshot.data;
         final co2Saved = userStats?.co2Saved ?? 0.0;
         final itemsRecycled = userStats?.itemsRecycled ?? 0;
@@ -282,6 +338,14 @@ class _EcoImpactDashboardState extends State<EcoImpactDashboard>
     return StreamBuilder<UserStatsModel?>(
       stream: _achievementsService.streamUserStats(userId),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingChart();
+        }
+
+        if (snapshot.hasError) {
+          return _buildErrorChart();
+        }
+
         final userStats = snapshot.data;
         final monthlyStats = userStats?.monthlyStats ?? {};
 
@@ -607,5 +671,150 @@ class _EcoImpactDashboardState extends State<EcoImpactDashboard>
       'Dec',
     ];
     return months[month - 1];
+  }
+
+  Widget _buildLoadingCards() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Your Impact',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildImpactCard(
+                icon: Icons.eco,
+                title: 'CO₂ Saved',
+                value: '0.0 kg',
+                color: const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildImpactCard(
+                icon: Icons.recycling,
+                title: 'Items Recycled',
+                value: '0',
+                color: const Color(0xFF3B82F6),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorCards() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Your Impact',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildImpactCard(
+                icon: Icons.eco,
+                title: 'CO₂ Saved',
+                value: '0.0 kg',
+                color: const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildImpactCard(
+                icon: Icons.recycling,
+                title: 'Items Recycled',
+                value: '0',
+                color: const Color(0xFF3B82F6),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingChart() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Monthly Activity',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          SizedBox(height: 20),
+          Center(child: CircularProgressIndicator()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorChart() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Monthly Activity',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          SizedBox(height: 20),
+          Center(
+            child: Text(
+              'Unable to load chart data',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

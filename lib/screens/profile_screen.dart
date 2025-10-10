@@ -6,7 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
+import '../services/auth_service.dart';
 import 'my_swaps_screen.dart';
+import 'provider_dashboard.dart';
+import 'eco_impact_dashboard.dart';
+import 'achievements_page.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -183,6 +187,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
   bool _photoUploading = false;
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
+  String? _userRole;
+  final _authService = AuthService();
 
   @override
   void initState() {
@@ -832,6 +838,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => const MySwapsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Eco Impact Section
+                    ListTile(
+                      leading: const Icon(
+                        Icons.eco_outlined,
+                        color: Color(0xFF10B981),
+                      ),
+                      title: const Text(
+                        'My Swap Eco Impact',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const EcoImpactDashboard(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Achievements Section
+                    ListTile(
+                      leading: const Icon(
+                        Icons.emoji_events_outlined,
+                        color: Color(0xFFFFD700),
+                      ),
+                      title: const Text(
+                        'Achievements',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AchievementsPage(),
                           ),
                         );
                       },
