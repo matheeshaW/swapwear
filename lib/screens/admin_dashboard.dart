@@ -3,6 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/admin_service.dart';
+import 'user_management_dialog.dart';
+import 'user_management_screen.dart';
+import 'user_management_utils.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -36,89 +39,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _loading = false;
       });
     }
-  }
-
-  void _editUserDialog(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    final email = (data['email'] ?? doc.id) as String;
-    final nameCtrl = TextEditingController(text: data['name'] ?? '');
-    final prefs = (data['preferences'] as List<dynamic>? ?? []).cast<String>();
-    final prefsCtrl = TextEditingController(text: prefs.join(', '));
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Edit $email'),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'User ID',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: SelectableText(doc.id, maxLines: 1),
-                    ),
-                    IconButton(
-                      tooltip: 'Copy UID',
-                      icon: const Icon(Icons.copy),
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: doc.id));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('User ID copied')),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                TextField(
-                  controller: prefsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Preferences (comma separated)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final list = prefsCtrl.text
-                    .split(',')
-                    .map((e) => e.trim())
-                    .where((e) => e.isNotEmpty)
-                    .toList();
-                await _adminService.updateUser(doc.id, {
-                  'name': nameCtrl.text.trim(),
-                  'preferences': list,
-                });
-                if (mounted) Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _addAdminDialog() {
@@ -265,10 +185,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                     minimumSize: const Size.fromHeight(52),
                   ),
+                  onPressed: () async {
+                    await UserManagementDialog.show(context);
+                  },
+                ),
+              ),
+              Container(
+                height: 52,
+                margin: const EdgeInsets.only(bottom: 8),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF667eea),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: const BorderSide(color: Color(0xFF667eea)),
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  icon: const Icon(Icons.open_in_full),
+                  label: const Text('Open in Full Screen'),
                   onPressed: () {
-                    setState(() {
-                      _showUserManagement = !_showUserManagement;
-                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const UserManagementScreen(),
+                      ),
+                    );
                   },
                 ),
               ),
@@ -404,47 +347,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 children: [
                                   IconButton(
                                     tooltip: 'Edit',
-                                    onPressed: () =>
-                                        _editUserDialog(docs[index]),
+                                    onPressed: () => editUserDialog(
+                                      context: context,
+                                      doc: docs[index],
+                                      adminService: _adminService,
+                                      onUserUpdated: () {
+                                        // No specific action needed here for now
+                                      },
+                                    ),
                                     icon: const Icon(Icons.edit_outlined),
                                   ),
                                   IconButton(
                                     tooltip: 'Delete',
                                     onPressed: () async {
-                                      final confirmed =
-                                          await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Deactivate user?',
-                                              ),
-                                              content: Text(
-                                                'This will delete profile for $uid.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
-                                                  child: const Text('Delete'),
-                                                ),
-                                              ],
-                                            ),
-                                          ) ??
-                                          false;
-                                      if (confirmed) {
-                                        await _adminService.deleteUser(uid);
-                                      }
+                                      await confirmDeleteUser(
+                                        context: context,
+                                        uid: uid,
+                                        adminService: _adminService,
+                                        onUserDeleted: () {
+                                          // No specific action needed here for now
+                                        },
+                                      );
                                     },
                                     icon: const Icon(Icons.delete_outline),
                                   ),
