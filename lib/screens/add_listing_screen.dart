@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -7,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:swapwear/theme/colors.dart';
 import 'browsing_screen.dart';
+import '../services/notification_service.dart';
 
 // data model to pass between steps
 class ListingData {
@@ -549,6 +549,18 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
         'tags': _tags,
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+      // Create notification for new listing
+      final notificationService = NotificationService();
+      await notificationService.createNotification(
+        userId: widget.userId,
+        title: '📦 New Listing Added!',
+        message:
+            'Your "${widget.listingData.title}" has been successfully added to the marketplace.',
+        type: 'Listings',
+        tag: '#NewListing',
+        data: {'action': 'view_listings'},
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Listing uploaded successfully!')),

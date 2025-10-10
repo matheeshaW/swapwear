@@ -1,10 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/swap_model.dart';
+import 'delivery_service.dart';
+import 'notification_service.dart';
+import 'achievements_service.dart';
 
 class SwapService {
   final FirebaseFirestore _db;
+  final DeliveryService _deliveryService;
+  final NotificationService _notificationService = NotificationService();
+  final AchievementsService _achievementsService = AchievementsService();
+
   SwapService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _deliveryService = DeliveryService(firestore: firestore);
 
   Future<String> createSwapRequest({
     required String fromUserId,
@@ -32,6 +40,17 @@ class SwapService {
         'participants': [fromUserId, toUserId],
       });
       await batch.commit();
+
+      // Create notification for the recipient
+      await _notificationService.createNotification(
+        userId: toUserId,
+        title: 'New Swap Request!',
+        message: 'Someone wants to swap with you. Check your swaps to respond.',
+        type: 'Swaps',
+        tag: '#NewRequest',
+        data: {'swapId': swapRef.id, 'action': 'view_swap'},
+      );
+
       return swapRef.id;
     } catch (e) {
       throw Exception('Failed to create swap request: $e');
@@ -40,10 +59,73 @@ class SwapService {
 
   Future<void> updateSwapStatus(String swapId, String status) async {
     try {
+      // Get swap details first
+      final swapDoc = await _db.collection('swaps').doc(swapId).get();
+      if (!swapDoc.exists) {
+        throw Exception('Swap not found');
+      }
+
+      final swapData = swapDoc.data()!;
+      final fromUserId = swapData['fromUserId'] as String;
+      final toUserId = swapData['toUserId'] as String;
+
       await _db.collection('swaps').doc(swapId).update({
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Create notifications based on status
+      String title;
+      String message;
+      String tag;
+
+      switch (status) {
+        case 'accepted':
+          title = 'Swap Accepted!';
+          message = 'Your swap request has been accepted!';
+          tag = '#Accepted';
+          break;
+        case 'rejected':
+          title = 'Swap Declined';
+          message = 'Your swap request was declined.';
+          tag = '#Declined';
+          break;
+        case 'cancelled':
+          title = 'Swap Cancelled';
+          message = 'The swap has been cancelled.';
+          tag = '#Cancelled';
+          break;
+        default:
+          title = 'Swap Updated';
+          message = 'Your swap status has been updated.';
+          tag = '#Updated';
+      }
+
+      // Notify the requester
+      await _notificationService.createNotification(
+        userId: fromUserId,
+        title: title,
+        message: message,
+        type: 'Swaps',
+        tag: tag,
+        data: {'swapId': swapId, 'action': 'view_swap'},
+      );
+
+      // If accepted, also notify the recipient and award achievements
+      if (status == 'accepted') {
+        await _notificationService.createNotification(
+          userId: toUserId,
+          title: 'Swap Confirmed!',
+          message: 'You have successfully confirmed the swap.',
+          type: 'Swaps',
+          tag: '#Confirmed',
+          data: {'swapId': swapId, 'action': 'view_swap'},
+        );
+
+        // Removed to prevent multiple awards
+        // await _awardSwapAchievements(fromUserId);
+        // await _awardSwapAchievements(toUserId);
+      }
     } catch (e) {
       throw Exception('Failed to update swap status: $e');
     }
@@ -51,12 +133,125 @@ class SwapService {
 
   Future<void> confirmSwap(String swapId) async {
     try {
+      // Get swap details first
+      final swapDoc = await _db.collection('swaps').doc(swapId).get();
+      if (!swapDoc.exists) {
+        throw Exception('Swap not found');
+      }
+
+      final swapData = swapDoc.data()!;
+      final fromUserId = swapData['fromUserId'] as String;
+      final toUserId = swapData['toUserId'] as String;
+
+      // Update swap status
       await _db.collection('swaps').doc(swapId).update({
         'status': 'confirmed',
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Create notifications for both users
+      await _notificationService.createNotification(
+        userId: fromUserId,
+        title: 'Swap Confirmed!',
+        message: 'Your swap has been confirmed and delivery is being arranged.',
+        type: 'Swaps',
+        tag: '#Confirmed',
+        data: {'swapId': swapId, 'action': 'view_swap'},
+      );
+
+      await _notificationService.createNotification(
+        userId: toUserId,
+        title: 'Swap Confirmed!',
+        message: 'Your swap has been confirmed and delivery is being arranged.',
+        type: 'Swaps',
+        tag: '#Confirmed',
+        data: {'swapId': swapId, 'action': 'view_swap'},
+      );
+
+      // Get listing details for the offered item
+      final offeredListingDoc = await _db
+          .collection('listings')
+          .doc(swapData['listingOfferedId'])
+          .get();
+
+      if (offeredListingDoc.exists) {
+        final offeredData = offeredListingDoc.data()!;
+
+        // Get user details for provider and receiver
+        final providerDoc = await _db
+            .collection('users')
+            .doc(swapData['fromUserId'])
+            .get();
+        final receiverDoc = await _db
+            .collection('users')
+            .doc(swapData['toUserId'])
+            .get();
+
+        // Create delivery record with basic location data
+        // Location data will be updated when user selects delivery location
+        await _deliveryService.createDelivery(
+          swapId: swapId,
+          itemName: offeredData['title'] ?? 'Unknown Item',
+          providerId: swapData['fromUserId'],
+          receiverId: swapData['toUserId'],
+          currentLocation: 'Location to be selected',
+          estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
+          itemImageUrl: offeredData['imageUrl'],
+          providerName: providerDoc.data()?['name'] ?? 'Provider',
+          receiverName: receiverDoc.data()?['name'] ?? 'Receiver',
+        );
+
+        // Create delivery notifications
+        await _notificationService.createNotification(
+          userId: fromUserId,
+          title: 'Delivery Started',
+          message: 'Your item is now being prepared for delivery.',
+          type: 'Deliveries',
+          tag: '#InTransit',
+          data: {'swapId': swapId, 'action': 'track_delivery'},
+        );
+
+        await _notificationService.createNotification(
+          userId: toUserId,
+          title: 'Delivery Started',
+          message: 'Your item is now being prepared for delivery.',
+          type: 'Deliveries',
+          tag: '#InTransit',
+          data: {'swapId': swapId, 'action': 'track_delivery'},
+        );
+
+        // Award achievements for both users
+        await _awardSwapAchievements(fromUserId);
+        await _awardSwapAchievements(toUserId);
+      }
     } catch (e) {
       throw Exception('Failed to confirm swap: $e');
+    }
+  }
+
+  // Award achievements for swap completion
+  Future<void> _awardSwapAchievements(String userId) async {
+    try {
+      final newBadges = await _achievementsService.awardSwapCompletion(userId);
+
+      // Send notification for new badges
+      if (newBadges.isNotEmpty) {
+        for (final badgeId in newBadges) {
+          final badge = AchievementsService.badgeDefinitions[badgeId];
+          if (badge != null) {
+            await _notificationService.createNotification(
+              userId: userId,
+              title: '🏆 New Badge Earned!',
+              message: 'You earned the ${badge['name']} badge!',
+              type: 'Badges',
+              tag: '#NewBadge',
+              data: {'badgeId': badgeId, 'action': 'view_achievements'},
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error awarding swap achievements: $e');
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/swap_model.dart';
 import '../services/swap_service.dart';
 import 'chat_screen.dart';
+import 'track_delivery_page.dart';
 
 class MySwapsScreen extends StatefulWidget {
   const MySwapsScreen({super.key});
@@ -709,6 +710,42 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
                           ),
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    // Track Delivery Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  TrackDeliveryPage(swapId: swap.id ?? ''),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.local_shipping_outlined,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Track Delivery',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3B82F6),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

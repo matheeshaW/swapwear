@@ -169,14 +169,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .where('fromUserId', isEqualTo: currentUser.uid)
           .where('toUserId', isEqualTo: widget.userId)
           .where('listingRequestedId', isEqualTo: widget.listingId)
-          .where(
-            'status',
-            whereIn: [
-              'accepted',
-              'confirmed'
-                  'completed',
-            ],
-          )
+          .where('status', whereIn: ['accepted', 'confirmed', 'completed'])
           .limit(1)
           .get();
       if (existingAcceptedOrCompleted.docs.isNotEmpty) {
@@ -377,9 +370,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
             enabled = false;
           } else if (status == 'completed') {
             label = 'Swap Completed';
-            enabled = false;
-          } else if (status == 'confirmed') {
-            label = 'Swap Confirmed';
             enabled = false;
           } else if (status == 'rejected') {
             label = _isSubmitting ? 'Loading…' : 'Request Swap Again';

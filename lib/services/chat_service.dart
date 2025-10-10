@@ -1,8 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/message_model.dart';
+import 'notification_service.dart';
 
 class ChatService {
   final FirebaseFirestore _db;
+  final NotificationService _notificationService = NotificationService();
+
   ChatService({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance;
 
@@ -19,6 +22,9 @@ class ChatService {
         'timestamp': FieldValue.serverTimestamp(),
         'seen': false,
       });
+
+      // Send notification to other participants
+      await _sendChatNotification(chatId, senderId, text);
     } catch (e) {
       throw Exception('Failed to send message: $e');
     }
@@ -73,6 +79,47 @@ class ChatService {
           .delete();
     } catch (e) {
       throw Exception('Failed to delete message: $e');
+    }
+  }
+
+  // Send chat notification to other participants
+  Future<void> _sendChatNotification(
+    String chatId,
+    String senderId,
+    String text,
+  ) async {
+    try {
+      // Get chat participants
+      final chatDoc = await _db.collection('chats').doc(chatId).get();
+      if (!chatDoc.exists) return;
+
+      final chatData = chatDoc.data()!;
+      final participants = List<String>.from(chatData['participants'] ?? []);
+
+      // Get sender name for notification
+      final senderDoc = await _db.collection('users').doc(senderId).get();
+      final senderName = senderDoc.data()?['name'] ?? 'Someone';
+
+      // Send notification to all participants except sender
+      for (final participantId in participants) {
+        if (participantId != senderId) {
+          await _notificationService.createNotification(
+            userId: participantId,
+            title: '💬 New Message from $senderName',
+            message: text.length > 50 ? '${text.substring(0, 50)}...' : text,
+            type: 'Chat',
+            tag: '#Chat',
+            data: {
+              'chatId': chatId,
+              'senderId': senderId,
+              'action': 'open_chat',
+            },
+          );
+        }
+      }
+    } catch (e) {
+      // Don't throw error for notification failure
+      print('Failed to send chat notification: $e');
     }
   }
 }

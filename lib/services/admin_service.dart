@@ -8,6 +8,8 @@ class AdminService {
 
   CollectionReference<Map<String, dynamic>> get _admins =>
       _db.collection('admins');
+  CollectionReference<Map<String, dynamic>> get _providers =>
+      _db.collection('providers');
   CollectionReference<Map<String, dynamic>> get _users =>
       _db.collection('users');
 
@@ -23,6 +25,27 @@ class AdminService {
     // 3) Fallback: a doc that has email field
     if (email != null && email.isNotEmpty) {
       final qByEmail = await _admins
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      if (qByEmail.docs.isNotEmpty) return true;
+    }
+
+    return false;
+  }
+
+  Future<bool> isProvider(String uid, {String? email}) async {
+    // 1) Fast path: doc keyed by uid
+    final byId = await _providers.doc(uid).get();
+    if (byId.exists) return true;
+
+    // 2) Fallback: a doc that has uid field
+    final qByUid = await _providers.where('uid', isEqualTo: uid).limit(1).get();
+    if (qByUid.docs.isNotEmpty) return true;
+
+    // 3) Fallback: a doc that has email field
+    if (email != null && email.isNotEmpty) {
+      final qByEmail = await _providers
           .where('email', isEqualTo: email)
           .limit(1)
           .get();
@@ -58,5 +81,26 @@ class AdminService {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  Future<void> addProvider({
+    required String uid,
+    required String email,
+    String role = 'provider',
+  }) async {
+    // Store provider in providers collection
+    await _providers.doc(uid).set({
+      'uid': uid,
+      'email': email,
+      'role': role,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    // Also update user's role in users collection
+    await _users.doc(uid).update({
+      'role': 'provider',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }

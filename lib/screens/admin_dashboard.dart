@@ -170,6 +170,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  void _addProviderDialog() {
+    final uidCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final roleCtrl = TextEditingController(text: 'provider');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Provider'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: uidCtrl,
+                decoration: const InputDecoration(labelText: 'User UID'),
+              ),
+              TextField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              TextField(
+                controller: roleCtrl,
+                decoration: const InputDecoration(labelText: 'Role'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _adminService.addProvider(
+                uid: uidCtrl.text.trim(),
+                email: emailCtrl.text.trim(),
+                role: roleCtrl.text.trim(),
+              );
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -225,7 +274,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
               Container(
                 height: 52,
-                margin: const EdgeInsets.only(bottom: 24),
+                margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF764ba2), Color(0xFF667eea)],
@@ -256,6 +305,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     minimumSize: const Size.fromHeight(52),
                   ),
                   onPressed: _addAdminDialog,
+                ),
+              ),
+              Container(
+                height: 52,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.local_shipping, color: Colors.white),
+                  label: const Text(
+                    'Add Provider',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: _addProviderDialog,
                 ),
               ),
               // Placeholder for future admin features
@@ -293,7 +374,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 12,
                                   offset: const Offset(0, 6),
                                 ),
