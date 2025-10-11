@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -184,36 +185,30 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: hasImage
-            ? Image.network(
-                url,
+            ? CachedNetworkImage(
+                imageUrl: url,
+                width: 64,
+                height: 64,
                 fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: const Color(0xFF10B981),
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
+                placeholder: (context, url) => Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: const Color(0xFF10B981),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    isOffered ? Icons.upload_outlined : Icons.download_outlined,
-                    color: const Color(0xFFEF4444),
-                    size: 28,
-                  );
-                },
-                // Add caching
-                cacheWidth: 128, // Cache at 2x the display size for quality
-                cacheHeight: 128,
+                  ),
+                ),
+                errorWidget: (context, url, error) => Icon(
+                  isOffered ? Icons.upload_outlined : Icons.download_outlined,
+                  color: const Color(0xFFEF4444),
+                  size: 28,
+                ),
+                memCacheWidth: 128,
+                memCacheHeight: 128,
+                maxWidthDiskCache: 256,
+                maxHeightDiskCache: 256,
               )
             : Icon(
                 isOffered ? Icons.upload_outlined : Icons.download_outlined,
