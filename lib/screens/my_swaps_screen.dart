@@ -19,6 +19,9 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
   late final Stream<List<SwapModel>> _swapsStream;
   String selectedFilter = 'All';
 
+  // Cache for listing metadata to avoid repeated Firestore calls
+  final Map<String, Map<String, dynamic>> _listingCache = {};
+
   final List<String> filters = [
     'All',
     'pending',
@@ -35,6 +38,7 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
     _uid = user!.uid;
 
     // Stream all swaps where current user is either sender or receiver
+    // and hasn't deleted the swap
     _swapsStream = FirebaseFirestore.instance
         .collection('swaps')
         .where(
@@ -47,6 +51,11 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
         .map((snapshot) {
           final swaps = snapshot.docs
               .map((d) => SwapModel.fromMap(d.data(), d.id))
+              .where((swap) {
+                // Filter out swaps that current user has deleted
+                final deletedBy = (swap.deletedBy as List<dynamic>?) ?? [];
+                return !deletedBy.contains(_uid);
+              })
               .toList();
           // Sort in memory instead of using Firestore orderBy
           swaps.sort((a, b) {
@@ -164,9 +173,6 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
         color: const Color(0xFFECFDF5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD1FAE5), width: 2),
-        image: hasImage
-            ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
-            : null,
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF10B981).withOpacity(0.1),
@@ -175,13 +181,46 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
           ),
         ],
       ),
-      child: hasImage
-          ? null
-          : Icon(
-              isOffered ? Icons.upload_outlined : Icons.download_outlined,
-              color: const Color(0xFF10B981),
-              size: 28,
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: hasImage
+            ? Image.network(
+                url,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: const Color(0xFF10B981),
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(
+                    isOffered ? Icons.upload_outlined : Icons.download_outlined,
+                    color: const Color(0xFFEF4444),
+                    size: 28,
+                  );
+                },
+                // Add caching
+                cacheWidth: 128, // Cache at 2x the display size for quality
+                cacheHeight: 128,
+              )
+            : Icon(
+                isOffered ? Icons.upload_outlined : Icons.download_outlined,
+                color: const Color(0xFF10B981),
+                size: 28,
+              ),
+      ),
     );
   }
 
@@ -307,20 +346,16 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: const [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: Color(0xFFEF4444),
-              size: 28,
-            ),
+            Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 28),
             SizedBox(width: 12),
             Text(
-              'Delete Swap?',
+              'Remove Swap?',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
           ],
         ),
         content: const Text(
-          'This will permanently delete this swap from your history. This action cannot be undone.',
+          'This will remove this swap from your history. The other user will still be able to see it.',
           style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), height: 1.5),
         ),
         actions: [
@@ -345,7 +380,7 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
               ),
             ),
             child: const Text(
-              'Delete',
+              'Remove',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
@@ -355,10 +390,12 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
 
     if (confirmed == true) {
       try {
-        await FirebaseFirestore.instance
-            .collection('swaps')
-            .doc(swapId)
-            .delete();
+        // Add current user to deletedBy array (soft delete)
+        await FirebaseFirestore.instance.collection('swaps').doc(swapId).update(
+          {
+            'deletedBy': FieldValue.arrayUnion([_uid]),
+          },
+        );
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -367,7 +404,7 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
                 children: [
                   Icon(Icons.check_circle, color: Colors.white, size: 20),
                   SizedBox(width: 8),
-                  Text('Swap deleted successfully'),
+                  Text('Swap removed from your history'),
                 ],
               ),
               backgroundColor: Color(0xFF10B981),
@@ -375,6 +412,30 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
               duration: Duration(seconds: 2),
             ),
           );
+        }
+
+        // Optional: Check if both users have deleted, then permanently delete
+        final swapDoc = await FirebaseFirestore.instance
+            .collection('swaps')
+            .doc(swapId)
+            .get();
+
+        if (swapDoc.exists) {
+          final data = swapDoc.data();
+          final deletedBy = (data?['deletedBy'] as List<dynamic>?) ?? [];
+          final fromUserId = data?['fromUserId'];
+          final toUserId = data?['toUserId'];
+
+          // If both users have deleted, permanently remove the document
+          if (deletedBy.length == 2 &&
+              deletedBy.contains(fromUserId) &&
+              deletedBy.contains(toUserId)) {
+            await FirebaseFirestore.instance
+                .collection('swaps')
+                .doc(swapId)
+                .delete();
+            debugPrint('Both users deleted swap - permanently removed');
+          }
         }
       } catch (e) {
         debugPrint('Error deleting swap: $e');
@@ -389,7 +450,7 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('Failed to delete: ${e.toString()}')),
+                  Expanded(child: Text('Failed to remove: ${e.toString()}')),
                 ],
               ),
               backgroundColor: const Color(0xFFEF4444),
@@ -406,16 +467,47 @@ class _MySwapsScreenState extends State<MySwapsScreen> {
     Future<Map<String, dynamic>> loadListingMeta() async {
       try {
         final db = FirebaseFirestore.instance;
-        final results = await Future.wait([
-          db.collection('listings').doc(swap.listingOfferedId).get(),
-          db.collection('listings').doc(swap.listingRequestedId).get(),
-        ]);
+
+        // Check cache first
+        final offeredCacheKey = swap.listingOfferedId;
+        final requestedCacheKey = swap.listingRequestedId;
+
+        Map<String, dynamic>? offeredData;
+        Map<String, dynamic>? requestedData;
+
+        // Load offered listing (with cache)
+        if (_listingCache.containsKey(offeredCacheKey)) {
+          offeredData = _listingCache[offeredCacheKey];
+        } else {
+          final offeredDoc = await db
+              .collection('listings')
+              .doc(offeredCacheKey)
+              .get();
+          offeredData = offeredDoc.data();
+          if (offeredData != null) {
+            _listingCache[offeredCacheKey] = offeredData;
+          }
+        }
+
+        // Load requested listing (with cache)
+        if (_listingCache.containsKey(requestedCacheKey)) {
+          requestedData = _listingCache[requestedCacheKey];
+        } else {
+          final requestedDoc = await db
+              .collection('listings')
+              .doc(requestedCacheKey)
+              .get();
+          requestedData = requestedDoc.data();
+          if (requestedData != null) {
+            _listingCache[requestedCacheKey] = requestedData;
+          }
+        }
 
         return {
-          'offeredTitle': results[0].data()?['title'] ?? 'Unknown',
-          'offeredImage': results[0].data()?['imageUrl'] ?? '',
-          'requestedTitle': results[1].data()?['title'] ?? 'Unknown',
-          'requestedImage': results[1].data()?['imageUrl'] ?? '',
+          'offeredTitle': offeredData?['title'] ?? 'Unknown',
+          'offeredImage': offeredData?['imageUrl'] ?? '',
+          'requestedTitle': requestedData?['title'] ?? 'Unknown',
+          'requestedImage': requestedData?['imageUrl'] ?? '',
         };
       } catch (e) {
         debugPrint('Error loading listing meta: $e');
