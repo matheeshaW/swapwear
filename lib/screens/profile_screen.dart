@@ -882,7 +882,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24),
                     ListTile(
                       leading: const Icon(Icons.swap_horiz),
-                      title: const Text('My Swaps'),
+                      title: const Text(
+                        'My Swap',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () {
                         Navigator.push(
