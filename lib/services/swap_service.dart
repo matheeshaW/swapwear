@@ -280,6 +280,13 @@ class SwapService {
         final fromUserDoc = await _db.collection('users').doc(fromUserId).get();
         final toUserDoc = await _db.collection('users').doc(toUserId).get();
 
+        // Get the main provider ID - use a dedicated delivery provider
+        // For now, we'll use a default provider ID that all deliveries share
+        // TODO: This should be configurable or retrieved from a settings collection
+        final mainProviderId =
+            'main_delivery_provider'; // Default provider ID for all deliveries
+        final mainProviderName = 'SwapWear Delivery Service';
+
         // Create dual delivery records
         await _deliveryService.createDualDeliveries(
           swapId: swapId,
@@ -287,12 +294,13 @@ class SwapService {
           toUserId: toUserId,
           fromItemName: offeredData['title'] ?? 'Unknown Item',
           toItemName: requestedData['title'] ?? 'Unknown Item',
-          providerId: fromUserId, // Assuming fromUserId is the provider
+          providerId:
+              mainProviderId, // Use the main provider ID for all deliveries
           currentLocation: 'Location to be selected',
           estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
           fromItemImageUrl: offeredData['imageUrl'],
           toItemImageUrl: requestedData['imageUrl'],
-          providerName: fromUserDoc.data()?['name'] ?? 'Provider',
+          providerName: mainProviderName,
           fromUserName: fromUserDoc.data()?['name'] ?? 'Provider',
           toUserName: toUserDoc.data()?['name'] ?? 'Receiver',
           pickupLatitude: user01Location['lat']?.toDouble(),

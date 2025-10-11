@@ -19,7 +19,8 @@ class DeliveryService {
     required String toUserId,
     required String fromItemName,
     required String toItemName,
-    required String providerId,
+    String?
+    providerId, // Made optional since we set it individually for each record
     required String currentLocation,
     DateTime? estimatedDelivery,
     String? fromItemImageUrl,
@@ -46,7 +47,9 @@ class DeliveryService {
       final fromDelivery = DeliveryModel(
         swapId: swapId,
         itemName: fromItemName,
-        providerId: providerId,
+        providerId:
+            providerId ??
+            fromUserId, // Use passed providerId or fallback to fromUserId
         receiverId: toUserId,
         status: 'Pending',
         currentLocation: currentLocation,
@@ -73,7 +76,9 @@ class DeliveryService {
       final toDelivery = DeliveryModel(
         swapId: swapId,
         itemName: toItemName,
-        providerId: providerId,
+        providerId:
+            providerId ??
+            toUserId, // Use passed providerId or fallback to toUserId
         receiverId: fromUserId,
         status: 'Pending',
         currentLocation: currentLocation,

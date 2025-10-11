@@ -40,7 +40,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
           final data = doc.data();
           setState(() {
             _providerName = data?['name'] ?? 'Provider';
-            _providerId = user.uid;
+            // Use the main delivery provider ID so all providers see all deliveries
+            _providerId = 'main_delivery_provider';
             _isLoading = false;
           });
           print(
@@ -49,7 +50,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         } else {
           setState(() {
             _providerName = 'Provider';
-            _providerId = user.uid;
+            // Use the main delivery provider ID so all providers see all deliveries
+            _providerId = 'main_delivery_provider';
             _isLoading = false;
           });
           print(
@@ -60,7 +62,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         print('Provider Dashboard - Error loading provider data: $e');
         setState(() {
           _providerName = 'Provider';
-          _providerId = user.uid;
+          // Use the main delivery provider ID so all providers see all deliveries
+          _providerId = 'main_delivery_provider';
           _isLoading = false;
         });
       }
@@ -196,9 +199,7 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
 
             // Stats Cards
             StreamBuilder<List<DeliveryModel>>(
-              stream: _providerId != null
-                  ? _deliveryService.streamProviderDeliveries(_providerId!)
-                  : Stream.value([]),
+              stream: _deliveryService.streamAllDeliveries(),
               builder: (context, snapshot) {
                 int activeDeliveries = 0;
                 int completedDeliveries = 0;
@@ -562,12 +563,10 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
   // Build delivery content based on selected tab
   Widget _buildDeliveryContent() {
     return StreamBuilder<List<DeliveryModel>>(
-      stream: _providerId != null
-          ? _deliveryService.streamProviderDeliveries(_providerId!)
-          : Stream.value([]),
+      stream: _deliveryService.streamAllDeliveries(),
       builder: (context, snapshot) {
         print(
-          'Provider Dashboard - StreamBuilder: Provider ID: $_providerId, Connection State: ${snapshot.connectionState}, Has Data: ${snapshot.hasData}, Data Length: ${snapshot.data?.length ?? 0}',
+          'Provider Dashboard - StreamBuilder: Connection State: ${snapshot.connectionState}, Has Data: ${snapshot.hasData}, Data Length: ${snapshot.data?.length ?? 0}',
         );
 
         if (snapshot.hasError) {
