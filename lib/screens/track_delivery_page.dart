@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/delivery_model.dart';
 import '../services/delivery_service.dart';
 
@@ -46,7 +47,10 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
         ),
       ),
       body: StreamBuilder<DeliveryModel?>(
-        stream: _deliveryService.streamDeliveryBySwapId(widget.swapId),
+        stream: _deliveryService.streamDeliveryBySwapAndOwner(
+          widget.swapId,
+          FirebaseAuth.instance.currentUser?.uid ?? '',
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(

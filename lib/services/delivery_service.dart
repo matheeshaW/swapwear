@@ -12,7 +12,101 @@ class DeliveryService {
   CollectionReference<Map<String, dynamic>> get _deliveries =>
       _db.collection('deliveries');
 
-  // Create a new delivery record
+  // Create dual delivery records for a swap (one for each user)
+  Future<List<String>> createDualDeliveries({
+    required String swapId,
+    required String fromUserId,
+    required String toUserId,
+    required String fromItemName,
+    required String toItemName,
+    required String providerId,
+    required String currentLocation,
+    DateTime? estimatedDelivery,
+    String? fromItemImageUrl,
+    String? toItemImageUrl,
+    String? providerName,
+    String? fromUserName,
+    String? toUserName,
+    double? pickupLatitude,
+    double? pickupLongitude,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
+    String? pickupAddress,
+    String? deliveryAddress,
+    double? distanceKm,
+    double? co2SavedKg,
+    String? routePolyline,
+  }) async {
+    try {
+      final swapPairId = '${swapId}_pair';
+      final batch = _db.batch();
+
+      // Create delivery record for the sender (fromUserId)
+      final fromDeliveryRef = _deliveries.doc('${swapId}_$fromUserId');
+      final fromDelivery = DeliveryModel(
+        swapId: swapId,
+        itemName: fromItemName,
+        providerId: providerId,
+        receiverId: toUserId,
+        status: 'Pending',
+        currentLocation: currentLocation,
+        estimatedDelivery: estimatedDelivery,
+        itemImageUrl: fromItemImageUrl,
+        providerName: providerName,
+        receiverName: toUserName,
+        ownerId: fromUserId,
+        partnerId: toUserId,
+        swapPairId: swapPairId,
+        pickupLatitude: pickupLatitude,
+        pickupLongitude: pickupLongitude,
+        deliveryLatitude: deliveryLatitude,
+        deliveryLongitude: deliveryLongitude,
+        pickupAddress: pickupAddress,
+        deliveryAddress: deliveryAddress,
+        distanceKm: distanceKm,
+        co2SavedKg: co2SavedKg,
+        routePolyline: routePolyline,
+      );
+
+      // Create delivery record for the receiver (toUserId)
+      final toDeliveryRef = _deliveries.doc('${swapId}_$toUserId');
+      final toDelivery = DeliveryModel(
+        swapId: swapId,
+        itemName: toItemName,
+        providerId: providerId,
+        receiverId: fromUserId,
+        status: 'Pending',
+        currentLocation: currentLocation,
+        estimatedDelivery: estimatedDelivery,
+        itemImageUrl: toItemImageUrl,
+        providerName: providerName,
+        receiverName: fromUserName,
+        ownerId: toUserId,
+        partnerId: fromUserId,
+        swapPairId: swapPairId,
+        pickupLatitude: pickupLatitude,
+        pickupLongitude: pickupLongitude,
+        deliveryLatitude: deliveryLatitude,
+        deliveryLongitude: deliveryLongitude,
+        pickupAddress: pickupAddress,
+        deliveryAddress: deliveryAddress,
+        distanceKm: distanceKm,
+        co2SavedKg: co2SavedKg,
+        routePolyline: routePolyline,
+      );
+
+      batch.set(fromDeliveryRef, fromDelivery.toMap());
+      batch.set(toDeliveryRef, toDelivery.toMap());
+
+      await batch.commit();
+
+      return [fromDeliveryRef.id, toDeliveryRef.id];
+    } catch (e) {
+      throw Exception('Failed to create dual deliveries: $e');
+    }
+  }
+
+  // Create a new delivery record (legacy method for backward compatibility)
   Future<String> createDelivery({
     required String swapId,
     required String itemName,
@@ -45,6 +139,11 @@ class DeliveryService {
         itemImageUrl: itemImageUrl,
         providerName: providerName,
         receiverName: receiverName,
+        ownerId:
+            receiverId, // For legacy compatibility, use receiverId as owner
+        partnerId:
+            providerId, // For legacy compatibility, use providerId as partner
+        swapPairId: '${swapId}_legacy', // Legacy identifier
         pickupLatitude: pickupLatitude,
         pickupLongitude: pickupLongitude,
         deliveryLatitude: deliveryLatitude,
@@ -96,6 +195,54 @@ class DeliveryService {
     }
   }
 
+  // Get delivery by swap ID and owner ID (for dual delivery system)
+  Future<DeliveryModel?> getDeliveryBySwapAndOwner(
+    String swapId,
+    String ownerId,
+  ) async {
+    try {
+      final doc = await _deliveries.doc('${swapId}_$ownerId').get();
+      if (doc.exists) {
+        return DeliveryModel.fromMap(doc.data()!, doc.id);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Failed to get delivery by swap and owner: $e');
+    }
+  }
+
+  // Get all deliveries for a specific owner
+  Future<List<DeliveryModel>> getDeliveriesByOwner(String ownerId) async {
+    try {
+      final query = await _deliveries
+          .where('ownerId', isEqualTo: ownerId)
+          .orderBy('lastUpdated', descending: true)
+          .get();
+
+      return query.docs
+          .map((doc) => DeliveryModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to get deliveries by owner: $e');
+    }
+  }
+
+  // Get all deliveries for a swap pair (both users)
+  Future<List<DeliveryModel>> getDeliveriesBySwapPair(String swapPairId) async {
+    try {
+      final query = await _deliveries
+          .where('swapPairId', isEqualTo: swapPairId)
+          .orderBy('lastUpdated', descending: true)
+          .get();
+
+      return query.docs
+          .map((doc) => DeliveryModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to get deliveries by swap pair: $e');
+    }
+  }
+
   // Stream delivery by ID
   Stream<DeliveryModel?> streamDelivery(String deliveryId) {
     return _deliveries.doc(deliveryId).snapshots().map((doc) {
@@ -123,6 +270,19 @@ class DeliveryService {
         });
   }
 
+  // Stream delivery by swap ID and owner ID (for dual delivery system)
+  Stream<DeliveryModel?> streamDeliveryBySwapAndOwner(
+    String swapId,
+    String ownerId,
+  ) {
+    return _deliveries.doc('${swapId}_$ownerId').snapshots().map((doc) {
+      if (doc.exists) {
+        return DeliveryModel.fromMap(doc.data()!, doc.id);
+      }
+      return null;
+    });
+  }
+
   // Update delivery location
   Future<void> updateDeliveryLocation({
     required String swapId,
@@ -148,9 +308,25 @@ class DeliveryService {
 
   // Stream deliveries for provider
   Stream<List<DeliveryModel>> streamProviderDeliveries(String providerId) {
+    print('DeliveryService - Querying deliveries for provider: $providerId');
     return _deliveries
         .where('providerId', isEqualTo: providerId)
         .orderBy('lastUpdated', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          print(
+            'DeliveryService - Found ${snapshot.docs.length} deliveries for provider: $providerId',
+          );
+          return snapshot.docs
+              .map((doc) => DeliveryModel.fromMap(doc.data(), doc.id))
+              .toList();
+        });
+  }
+
+  // Stream deliveries for user (either as provider or owner)
+  Stream<List<DeliveryModel>> streamUserDeliveries(String userId) {
+    return _deliveries
+        .where('providerId', isEqualTo: userId)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -202,13 +378,13 @@ class DeliveryService {
 
       await _deliveries.doc(deliveryId).update(updateData);
 
-      // Send notification for delivery status update
+      // Send targeted notification to the owner of the delivery record
       final deliveryDoc = await _deliveries.doc(deliveryId).get();
       if (deliveryDoc.exists) {
         final deliveryData = deliveryDoc.data()!;
-        final providerId = deliveryData['providerId'] as String?;
-        final receiverId = deliveryData['receiverId'] as String?;
+        final ownerId = deliveryData['ownerId'] as String?;
         final itemName = deliveryData['itemName'] as String?;
+        final swapId = deliveryData['swapId'] as String?;
 
         String title;
         String message;
@@ -218,18 +394,18 @@ class DeliveryService {
           case 'Approved':
             title = 'Delivery Approved';
             message =
-                'Your delivery for $itemName has been approved and is being prepared.';
+                'Your delivery for "$itemName" has been approved and is being prepared.';
             tag = '#Approved';
             break;
           case 'Out for Delivery':
             title = 'Out for Delivery';
-            message = 'Your item $itemName is now out for delivery!';
+            message = 'Your item "$itemName" is now out for delivery!';
             tag = '#OutForDelivery';
             break;
           case 'Completed':
             title = 'Delivery Completed';
             message =
-                'Your delivery for $itemName has been completed successfully!';
+                'Your delivery for "$itemName" has been completed successfully!';
             tag = '#Completed';
             break;
           default:
@@ -238,26 +414,19 @@ class DeliveryService {
             tag = '#Updated';
         }
 
-        // Notify both provider and receiver
-        if (providerId != null) {
+        // Send notification only to the owner of this delivery record
+        if (ownerId != null) {
           await _notificationService.createNotification(
-            userId: providerId,
+            userId: ownerId,
             title: title,
             message: message,
             type: 'Deliveries',
             tag: tag,
-            data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
-          );
-        }
-
-        if (receiverId != null) {
-          await _notificationService.createNotification(
-            userId: receiverId,
-            title: title,
-            message: message,
-            type: 'Deliveries',
-            tag: tag,
-            data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+            data: {
+              'deliveryId': deliveryId,
+              'swapId': swapId,
+              'action': 'track_delivery',
+            },
           );
         }
       }
@@ -324,6 +493,9 @@ class DeliveryService {
               tag = '#Updated';
           }
 
+          // Get swapId for navigation
+          final swapId = deliveryData['swapId'] as String?;
+
           // Notify both provider and receiver
           if (providerId != null) {
             await _notificationService.createNotification(
@@ -332,7 +504,11 @@ class DeliveryService {
               message: message,
               type: 'Deliveries',
               tag: tag,
-              data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+              data: {
+                'deliveryId': deliveryId,
+                'swapId': swapId,
+                'action': 'track_delivery',
+              },
             );
           }
 
@@ -343,7 +519,11 @@ class DeliveryService {
               message: message,
               type: 'Deliveries',
               tag: tag,
-              data: {'deliveryId': deliveryId, 'action': 'track_delivery'},
+              data: {
+                'deliveryId': deliveryId,
+                'swapId': swapId,
+                'action': 'track_delivery',
+              },
             );
           }
         }
@@ -395,6 +575,9 @@ class DeliveryService {
           final itemName = deliveryData['itemName'] as String?;
 
           if (fromUserId != null && toUserId != null) {
+            // Get swapId for navigation
+            final swapId = deliveryData['swapId'] as String?;
+
             // Notify provider
             await _notificationService.createNotification(
               userId: fromUserId,
@@ -403,7 +586,11 @@ class DeliveryService {
                   'Your delivery of "$itemName" has been completed successfully.',
               type: 'Deliveries',
               tag: '#Completed',
-              data: {'deliveryId': deliveryId, 'action': 'view_delivery'},
+              data: {
+                'deliveryId': deliveryId,
+                'swapId': swapId,
+                'action': 'view_delivery',
+              },
             );
 
             // Notify receiver
@@ -413,7 +600,11 @@ class DeliveryService {
               message: 'Your "$itemName" has been delivered successfully.',
               type: 'Deliveries',
               tag: '#Delivered',
-              data: {'deliveryId': deliveryId, 'action': 'view_delivery'},
+              data: {
+                'deliveryId': deliveryId,
+                'swapId': swapId,
+                'action': 'view_delivery',
+              },
             );
           }
         }

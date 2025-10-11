@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import '../services/ai_service.dart';
 import '../services/storage_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import 'my_swaps_screen.dart';
 import 'provider_dashboard.dart';
 import 'eco_impact_dashboard.dart';
@@ -926,10 +927,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                       ),
                     ],
+
+                    // Notification Settings
+                    const SizedBox(height: 8),
+                    _buildNotificationSettings(),
                   ],
                 ),
               ),
             ),
     );
+  }
+
+  Widget _buildNotificationSettings() {
+    return StreamBuilder<bool>(
+      stream: _getNotificationSettingsStream(),
+      builder: (context, snapshot) {
+        final notificationsEnabled = snapshot.data ?? true;
+
+        return ListTile(
+          leading: Icon(
+            notificationsEnabled
+                ? Icons.notifications
+                : Icons.notifications_off,
+            color: notificationsEnabled
+                ? const Color(0xFF10B981)
+                : const Color(0xFF6B7280),
+          ),
+          title: const Text(
+            'Push Notifications',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          subtitle: Text(
+            notificationsEnabled ? 'Enabled' : 'Disabled',
+            style: TextStyle(
+              color: notificationsEnabled
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFF6B7280),
+            ),
+          ),
+          trailing: Switch(
+            value: notificationsEnabled,
+            onChanged: (value) async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                await NotificationService().toggleNotifications(
+                  user.uid,
+                  value,
+                );
+                setState(() {}); // Refresh the UI
+              }
+            },
+            activeColor: const Color(0xFF10B981),
+          ),
+        );
+      },
+    );
+  }
+
+  Stream<bool> _getNotificationSettingsStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return Stream.value(true);
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) return true;
+          final data = doc.data()!;
+          return data['notificationsEnabled'] as bool? ?? true;
+        });
   }
 }

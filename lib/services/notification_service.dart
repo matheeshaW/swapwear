@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -123,7 +124,16 @@ class NotificationService {
   // Handle background messages
   Future<void> _handleBackgroundMessage(RemoteMessage message) async {
     print('Received background message: ${message.messageId}');
-    // Navigate to notifications screen or specific screen based on data
+
+    // Save notification to Firestore
+    await _saveNotificationToFirestore(message);
+
+    // Navigate to specific screen based on data
+    if (message.data['action'] == 'open_chat' &&
+        message.data['chatId'] != null) {
+      // This will be handled by the main app navigation
+      print('Should navigate to chat: ${message.data['chatId']}');
+    }
   }
 
   // Save notification to Firestore
@@ -431,6 +441,143 @@ class NotificationService {
       await batch.commit();
     } catch (e) {
       print('Error creating sample notifications: $e');
+    }
+  }
+
+  // Send FCM notification to a specific user
+  Future<void> sendFCMNotification({
+    required String targetUserId,
+    required String title,
+    required String body,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      // Get target user's FCM token
+      final userDoc = await _db.collection('users').doc(targetUserId).get();
+      if (!userDoc.exists) return;
+
+      final userData = userDoc.data()!;
+      final fcmToken = userData['fcmToken'] as String?;
+
+      if (fcmToken == null) {
+        print('No FCM token found for user: $targetUserId');
+        return;
+      }
+
+      // This would typically be done via a Cloud Function
+      // For now, we'll create a local notification and save to Firestore
+      await createNotification(
+        userId: targetUserId,
+        title: title,
+        message: body,
+        type: type,
+        tag: '#$type',
+        data: data,
+      );
+
+      // Show local notification if app is in foreground
+      await _showChatLocalNotification(
+        title: title,
+        body: body,
+        data: data ?? {},
+      );
+    } catch (e) {
+      print('Error sending FCM notification: $e');
+    }
+  }
+
+  // Show local notification for chat messages
+  Future<void> _showChatLocalNotification({
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    final androidDetails = AndroidNotificationDetails(
+      'chat_notifications',
+      'Chat Messages',
+      channelDescription: 'Notifications for new chat messages',
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+      sound: const RawResourceAndroidNotificationSound('notification'),
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 250, 250, 250]),
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: 'notification.wav',
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title,
+      body,
+      details,
+      payload: data.toString(),
+    );
+  }
+
+  // Get FCM token for current user
+  Future<String?> getCurrentUserFCMToken() async {
+    try {
+      return await _messaging.getToken();
+    } catch (e) {
+      print('Error getting FCM token: $e');
+      return null;
+    }
+  }
+
+  // Update FCM token for current user
+  Future<void> updateFCMToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final token = await _messaging.getToken();
+      if (token != null) {
+        await _db.collection('users').doc(user.uid).update({
+          'fcmToken': token,
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        });
+        print('FCM token updated for user: ${user.uid}');
+      }
+    } catch (e) {
+      print('Error updating FCM token: $e');
+    }
+  }
+
+  // Check if notifications are enabled for user
+  Future<bool> areNotificationsEnabled(String userId) async {
+    try {
+      final userDoc = await _db.collection('users').doc(userId).get();
+      if (!userDoc.exists) return true; // Default to enabled
+
+      final userData = userDoc.data()!;
+      return userData['notificationsEnabled'] as bool? ?? true;
+    } catch (e) {
+      print('Error checking notification settings: $e');
+      return true; // Default to enabled
+    }
+  }
+
+  // Toggle notifications for user
+  Future<void> toggleNotifications(String userId, bool enabled) async {
+    try {
+      await _db.collection('users').doc(userId).update({
+        'notificationsEnabled': enabled,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error toggling notifications: $e');
     }
   }
 }

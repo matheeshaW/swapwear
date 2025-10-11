@@ -13,8 +13,10 @@ class ProviderDashboard extends StatefulWidget {
 
 class _ProviderDashboardState extends State<ProviderDashboard> {
   String? _providerName;
+  String? _providerId;
   bool _isLoading = true;
-  bool _showDeliveryManagement = false;
+  int _selectedDeliveryTab =
+      0; // 0: All, 1: Pending, 2: Approved, 3: Out for Delivery, 4: Completed
   final _deliveryService = DeliveryService();
 
   @override
@@ -25,6 +27,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
 
   Future<void> _loadProviderData() async {
     final user = FirebaseAuth.instance.currentUser;
+    print('Provider Dashboard - Loading provider data for user: ${user?.uid}');
+
     if (user != null) {
       try {
         final doc = await FirebaseFirestore.instance
@@ -36,22 +40,34 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
           final data = doc.data();
           setState(() {
             _providerName = data?['name'] ?? 'Provider';
+            _providerId = user.uid;
             _isLoading = false;
           });
+          print(
+            'Provider Dashboard - Provider ID set to: $_providerId, Name: $_providerName',
+          );
         } else {
           setState(() {
             _providerName = 'Provider';
+            _providerId = user.uid;
             _isLoading = false;
           });
+          print(
+            'Provider Dashboard - User doc not found, Provider ID set to: $_providerId',
+          );
         }
       } catch (e) {
+        print('Provider Dashboard - Error loading provider data: $e');
         setState(() {
           _providerName = 'Provider';
+          _providerId = user.uid;
           _isLoading = false;
         });
       }
     } else {
+      print('Provider Dashboard - No user logged in');
       setState(() {
+        _providerId = null;
         _isLoading = false;
       });
     }
@@ -73,6 +89,25 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF10B981)),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios,
+            color: Color(0xFF0F172A),
+            size: 20,
+          ),
+          onPressed: () {
+            // Navigate back to browsing screen with profile tab
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/browse',
+              (route) => false,
+              arguments: {
+                'userId': FirebaseAuth.instance.currentUser?.uid,
+                'initialTab': 3, // Profile tab index
+              },
+            );
+          },
+        ),
         title: const Text(
           'Provider Dashboard',
           style: TextStyle(
@@ -161,7 +196,9 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
 
             // Stats Cards
             StreamBuilder<List<DeliveryModel>>(
-              stream: _deliveryService.streamAllDeliveries(),
+              stream: _providerId != null
+                  ? _deliveryService.streamProviderDeliveries(_providerId!)
+                  : Stream.value([]),
               builder: (context, snapshot) {
                 int activeDeliveries = 0;
                 int completedDeliveries = 0;
@@ -202,9 +239,9 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
 
             const SizedBox(height: 24),
 
-            // Action Buttons
+            // Delivery Management Section with Tabs
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -217,10 +254,10 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
                 ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Quick Actions',
+                    'Delivery Management',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -229,172 +266,17 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Manage Deliveries Button
-                  Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF10B981), Color(0xFF059669)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _showDeliveryManagement = !_showDeliveryManagement;
-                        });
-                      },
-                      icon: const Icon(
-                        Icons.assignment_outlined,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      label: const Text(
-                        'Manage All Deliveries',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        minimumSize: const Size.fromHeight(56),
-                      ),
-                    ),
-                  ),
+                  // Delivery Tabs
+                  _buildDeliveryTabs(),
 
                   const SizedBox(height: 16),
 
-                  // Profile Button
-                  Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF10B981),
-                        width: 2,
-                      ),
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/profile');
-                      },
-                      icon: const Icon(
-                        Icons.person_outline,
-                        color: Color(0xFF10B981),
-                        size: 20,
-                      ),
-                      label: const Text(
-                        'View Profile',
-                        style: TextStyle(
-                          color: Color(0xFF10B981),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        minimumSize: const Size.fromHeight(56),
-                      ),
-                    ),
-                  ),
+                  // Delivery Content
+                  _buildDeliveryContent(),
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // Delivery Management Section
-            if (_showDeliveryManagement) ...[
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Manage All Deliveries',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    StreamBuilder<List<DeliveryModel>>(
-                      stream: _deliveryService.streamAllDeliveries(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: CircularProgressIndicator(
-                                color: Color(0xFF10B981),
-                              ),
-                            ),
-                          );
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.local_shipping_outlined,
-                                    size: 48,
-                                    color: Color(0xFF6B7280),
-                                  ),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    'No deliveries available yet',
-                                    style: TextStyle(
-                                      color: Color(0xFF6B7280),
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-
-                        return Column(
-                          children: snapshot.data!
-                              .map((delivery) => _buildDeliveryCard(delivery))
-                              .toList(),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
           ],
         ),
       ),
@@ -454,29 +336,359 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
     );
   }
 
-  Widget _buildDeliveryCard(DeliveryModel delivery) {
-    Color getStatusColor() {
-      switch (delivery.status) {
-        case 'Pending':
-          return const Color(0xFF6B7280);
-        case 'Approved':
-          return const Color(0xFF3B82F6);
-        case 'Out for Delivery':
-          return const Color(0xFFF59E0B);
-        case 'Completed':
-          return const Color(0xFF10B981);
-        default:
-          return const Color(0xFF6B7280);
+  // Get status icon
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.schedule;
+      case 'approved':
+        return Icons.check_circle_outline;
+      case 'out for delivery':
+        return Icons.local_shipping;
+      case 'completed':
+        return Icons.check_circle;
+      default:
+        return Icons.info_outline;
+    }
+  }
+
+  // Format time ago (like notifications)
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
+  }
+
+  // Show status update dialog
+  Future<void> _showStatusUpdateDialog(DeliveryModel delivery) async {
+    final statusSteps = DeliveryModel.statusSteps;
+    final currentIndex = statusSteps.indexOf(delivery.status);
+    final availableStatuses = statusSteps.skip(currentIndex + 1).toList();
+
+    if (availableStatuses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No further status updates available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    String? selectedStatus = availableStatuses.first;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update Status for ${delivery.itemName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Current Status: ${delivery.status}'),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: selectedStatus,
+              decoration: const InputDecoration(
+                labelText: 'New Status',
+                border: OutlineInputBorder(),
+              ),
+              items: availableStatuses.map((status) {
+                return DropdownMenuItem(value: status, child: Text(status));
+              }).toList(),
+              onChanged: (value) {
+                selectedStatus = value;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, selectedStatus),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      try {
+        await _deliveryService.updateDeliveryStatus(
+          deliveryId: delivery.id!,
+          newStatus: result,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Status updated to $result'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update status: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  // Get status color
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return const Color(0xFFF59E0B);
+      case 'approved':
+        return const Color(0xFF3B82F6);
+      case 'out for delivery':
+        return const Color(0xFF8B5CF6);
+      case 'completed':
+        return const Color(0xFF10B981);
+      default:
+        return const Color(0xFF6B7280);
+    }
+  }
+
+  // Build delivery tabs
+  Widget _buildDeliveryTabs() {
+    final tabs = [
+      'All',
+      'Pending',
+      'Approved',
+      'Out for Delivery',
+      'Completed',
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: tabs.asMap().entries.map((entry) {
+          final index = entry.key;
+          final tab = entry.value;
+          final isSelected = _selectedDeliveryTab == index;
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedDeliveryTab = index;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF10B981)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFE5E7EB),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                tab,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : const Color(0xFF6B7280),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // Build delivery content based on selected tab
+  Widget _buildDeliveryContent() {
+    return StreamBuilder<List<DeliveryModel>>(
+      stream: _providerId != null
+          ? _deliveryService.streamProviderDeliveries(_providerId!)
+          : Stream.value([]),
+      builder: (context, snapshot) {
+        print(
+          'Provider Dashboard - StreamBuilder: Provider ID: $_providerId, Connection State: ${snapshot.connectionState}, Has Data: ${snapshot.hasData}, Data Length: ${snapshot.data?.length ?? 0}',
+        );
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: Color(0xFF10B981)),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    size: 48,
+                    color: Color(0xFF6B7280),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'No deliveries available yet',
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Filter deliveries based on selected tab
+        List<DeliveryModel> filteredDeliveries = _filterDeliveriesByTab(
+          snapshot.data!,
+        );
+
+        if (filteredDeliveries.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(
+                    _getTabIcon(_selectedDeliveryTab),
+                    size: 48,
+                    color: const Color(0xFF6B7280),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No deliveries available yet',
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Group deliveries by swap pair to show both items together
+        Map<String, List<DeliveryModel>> groupedDeliveries =
+            _groupDeliveriesBySwapPair(filteredDeliveries);
+
+        // Display grouped deliveries (two items per swap)
+        return Column(
+          children: groupedDeliveries.entries
+              .map((entry) => _buildSwapDeliveryGroup(entry.key, entry.value))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  // Filter deliveries based on selected tab
+  List<DeliveryModel> _filterDeliveriesByTab(List<DeliveryModel> deliveries) {
+    switch (_selectedDeliveryTab) {
+      case 0: // All
+        return deliveries;
+      case 1: // Pending
+        return deliveries
+            .where((d) => d.status.toLowerCase() == 'pending')
+            .toList();
+      case 2: // Approved
+        return deliveries
+            .where((d) => d.status.toLowerCase() == 'approved')
+            .toList();
+      case 3: // Out for Delivery
+        return deliveries
+            .where((d) => d.status.toLowerCase() == 'out for delivery')
+            .toList();
+      case 4: // Completed
+        return deliveries
+            .where((d) => d.status.toLowerCase() == 'completed')
+            .toList();
+      default:
+        return deliveries;
+    }
+  }
+
+  // Get tab icon
+  IconData _getTabIcon(int tabIndex) {
+    switch (tabIndex) {
+      case 0:
+        return Icons.list;
+      case 1:
+        return Icons.schedule;
+      case 2:
+        return Icons.check_circle_outline;
+      case 3:
+        return Icons.local_shipping;
+      case 4:
+        return Icons.check_circle;
+      default:
+        return Icons.list;
+    }
+  }
+
+  // Group deliveries by swap pair
+  Map<String, List<DeliveryModel>> _groupDeliveriesBySwapPair(
+    List<DeliveryModel> deliveries,
+  ) {
+    final Map<String, List<DeliveryModel>> grouped = {};
+
+    for (final delivery in deliveries) {
+      final swapPairId = delivery.swapPairId;
+      if (swapPairId.isNotEmpty) {
+        if (!grouped.containsKey(swapPairId)) {
+          grouped[swapPairId] = [];
+        }
+        grouped[swapPairId]!.add(delivery);
       }
     }
 
+    return grouped;
+  }
+
+  // Build swap delivery group (shows both items for a swap)
+  Widget _buildSwapDeliveryGroup(
+    String swapPairId,
+    List<DeliveryModel> deliveries,
+  ) {
+    if (deliveries.isEmpty) return const SizedBox.shrink();
+
+    final swapId = deliveries.first.swapId;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: getStatusColor().withOpacity(0.2), width: 1),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -488,201 +700,186 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              // Item Image
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFD1FAE5), width: 1),
-                  image: delivery.itemImageUrl != null
-                      ? DecorationImage(
-                          image: NetworkImage(delivery.itemImageUrl!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: delivery.itemImageUrl == null
-                    ? const Icon(
-                        Icons.inventory_2_outlined,
-                        color: Color(0xFF10B981),
-                        size: 24,
-                      )
-                    : null,
+          // Swap header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
-              const SizedBox(width: 12),
-              // Item Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      delivery.itemName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'To: ${delivery.receiverName ?? 'Unknown'}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Provider: ${delivery.providerName ?? 'Unknown'}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Swap #${delivery.swapId}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Status Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: getStatusColor().withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  delivery.status,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: getStatusColor(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Status Update Section
-          if (!delivery.isCompleted) ...[
-            Row(
+            ),
+            child: Row(
               children: [
-                Expanded(
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                   child: Text(
-                    'Update Status:',
-                    style: TextStyle(
-                      fontSize: 14,
+                    'Swap ID: $swapId',
+                    style: const TextStyle(
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: getStatusColor(),
+                      color: Color(0xFF10B981),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: DropdownButton<String>(
-                    value: delivery.nextStatus,
-                    isExpanded: true,
-                    underline: Container(),
-                    items: DeliveryModel.statusSteps
-                        .where((status) => delivery.canUpdateTo(status))
-                        .map(
-                          (status) => DropdownMenuItem(
-                            value: status,
-                            child: Text(
-                              status,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (newStatus) async {
-                      if (newStatus != null) {
-                        try {
-                          await _deliveryService.updateDeliveryStatus(
-                            deliveryId: delivery.id!,
-                            newStatus: newStatus,
-                          );
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Status updated to $newStatus'),
-                                backgroundColor: const Color(0xFF10B981),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to update status: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            Row(
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF10B981),
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 Text(
-                  'Delivery completed successfully',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: getStatusColor(),
+                  '${deliveries.length} items',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
                   ),
                 ),
               ],
             ),
-          ],
-          if (delivery.lastUpdated != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Last updated: ${_formatDateTime(delivery.lastUpdated!)}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+          ),
+
+          // Individual delivery items
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: deliveries
+                  .map((delivery) => _buildIndividualDeliveryCard(delivery))
+                  .toList(),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
+  // Build individual delivery card within a swap group
+  Widget _buildIndividualDeliveryCard(DeliveryModel delivery) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _getStatusColor(delivery.status).withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Item image or icon
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _getStatusColor(delivery.status).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: delivery.itemImageUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      delivery.itemImageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        _getStatusIcon(delivery.status),
+                        color: _getStatusColor(delivery.status),
+                        size: 24,
+                      ),
+                    ),
+                  )
+                : Icon(
+                    _getStatusIcon(delivery.status),
+                    color: _getStatusColor(delivery.status),
+                    size: 24,
+                  ),
+          ),
+          const SizedBox(width: 12),
 
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes} minutes ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours} hours ago';
-    } else {
-      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
-    }
+          // Item details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Item name
+                Text(
+                  delivery.itemName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 4),
+
+                // Owner info
+                Text(
+                  'Owner: ${delivery.receiverName}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 4),
+
+                // Status and timestamp
+                Row(
+                  children: [
+                    // Status tag
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(delivery.status),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        delivery.status,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+
+                    // Timestamp
+                    Text(
+                      _formatTimeAgo(delivery.lastUpdated ?? DateTime.now()),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Update button
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showStatusUpdateDialog(delivery),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit, color: Colors.white, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

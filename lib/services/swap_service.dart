@@ -187,25 +187,36 @@ class SwapService {
             .doc(swapData['toUserId'])
             .get();
 
-        // Create delivery record with basic location data
-        // Location data will be updated when user selects delivery location
-        await _deliveryService.createDelivery(
+        // Get listing details for the requested item
+        final requestedListingDoc = await _db
+            .collection('listings')
+            .doc(swapData['listingRequestedId'])
+            .get();
+
+        // Create dual delivery records (one for each user)
+        await _deliveryService.createDualDeliveries(
           swapId: swapId,
-          itemName: offeredData['title'] ?? 'Unknown Item',
-          providerId: swapData['fromUserId'],
-          receiverId: swapData['toUserId'],
+          fromUserId: swapData['fromUserId'],
+          toUserId: swapData['toUserId'],
+          fromItemName: offeredData['title'] ?? 'Unknown Item',
+          toItemName: requestedListingDoc.data()?['title'] ?? 'Unknown Item',
+          providerId:
+              swapData['fromUserId'], // Assuming fromUserId is the provider
           currentLocation: 'Location to be selected',
           estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
-          itemImageUrl: offeredData['imageUrl'],
+          fromItemImageUrl: offeredData['imageUrl'],
+          toItemImageUrl: requestedListingDoc.data()?['imageUrl'],
           providerName: providerDoc.data()?['name'] ?? 'Provider',
-          receiverName: receiverDoc.data()?['name'] ?? 'Receiver',
+          fromUserName: providerDoc.data()?['name'] ?? 'Provider',
+          toUserName: receiverDoc.data()?['name'] ?? 'Receiver',
         );
 
-        // Create delivery notifications
+        // Create delivery notifications for each user's specific item
         await _notificationService.createNotification(
           userId: fromUserId,
           title: 'Delivery Started',
-          message: 'Your item is now being prepared for delivery.',
+          message:
+              'Your "${offeredData['title'] ?? 'item'}" is now being prepared for delivery.',
           type: 'Deliveries',
           tag: '#InTransit',
           data: {'swapId': swapId, 'action': 'track_delivery'},
@@ -214,7 +225,8 @@ class SwapService {
         await _notificationService.createNotification(
           userId: toUserId,
           title: 'Delivery Started',
-          message: 'Your item is now being prepared for delivery.',
+          message:
+              'Your "${requestedListingDoc.data()?['title'] ?? 'item'}" is now being prepared for delivery.',
           type: 'Deliveries',
           tag: '#InTransit',
           data: {'swapId': swapId, 'action': 'track_delivery'},

@@ -7,6 +7,7 @@ import 'services/profile_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/achievements_service.dart';
+import 'firebase_messaging_handler.dart';
 import 'screens/profile_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/browsing_screen.dart';
@@ -18,11 +19,16 @@ import 'screens/enhanced_track_delivery_page.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/eco_impact_dashboard.dart';
 import 'screens/achievements_page.dart';
+import 'screens/chat_screen.dart';
+import 'screens/my_swaps_screen.dart';
 import 'theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Initialize Firebase messaging background handler
+  FirebaseMessagingHandler().initialize();
 
   // Initialize notification service
   await NotificationService().initialize();
@@ -65,13 +71,27 @@ class MyApp extends StatelessWidget {
                   as Map<String, dynamic>?;
           return EnhancedTrackDeliveryPage(swapId: args?['swapId'] ?? '');
         },
+        '/chat': (context) {
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+          return ChatScreen(
+            chatId: args?['chatId'] ?? '',
+            currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
+            swapId: args?['swapId'],
+          );
+        },
+        '/my-swaps': (context) => const MySwapsScreen(),
         '/dev-swap-test': (context) => const DevSwapTestScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/browse') {
-          final args = settings.arguments as Map<String, dynamic>;
+          final args = settings.arguments as Map<String, dynamic>?;
           return MaterialPageRoute(
-            builder: (context) => BrowsingScreen(userId: args['userId']),
+            builder: (context) => BrowsingScreen(
+              userId: args?['userId'] ?? '',
+              initialTab: args?['initialTab'],
+            ),
           );
         }
         return null; // fallback to default
