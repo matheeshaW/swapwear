@@ -14,6 +14,11 @@ class DeliveryModel {
   final String? providerName;
   final String? receiverName;
 
+  // Dual delivery support
+  final String ownerId; // The user who owns this specific delivery record
+  final String partnerId; // The other user in the swap
+  final String swapPairId; // Links both delivery records together
+
   // Enhanced location and tracking data
   final double? pickupLatitude;
   final double? pickupLongitude;
@@ -40,6 +45,9 @@ class DeliveryModel {
     this.itemImageUrl,
     this.providerName,
     this.receiverName,
+    required this.ownerId,
+    required this.partnerId,
+    required this.swapPairId,
     this.pickupLatitude,
     this.pickupLongitude,
     this.deliveryLatitude,
@@ -71,6 +79,9 @@ class DeliveryModel {
       itemImageUrl: map['itemImageUrl'],
       providerName: map['providerName'],
       receiverName: map['receiverName'],
+      ownerId: map['ownerId'] ?? '',
+      partnerId: map['partnerId'] ?? '',
+      swapPairId: map['swapPairId'] ?? '',
       pickupLatitude: map['pickupLatitude']?.toDouble(),
       pickupLongitude: map['pickupLongitude']?.toDouble(),
       deliveryLatitude: map['deliveryLatitude']?.toDouble(),
@@ -106,6 +117,9 @@ class DeliveryModel {
       'itemImageUrl': itemImageUrl,
       'providerName': providerName,
       'receiverName': receiverName,
+      'ownerId': ownerId,
+      'partnerId': partnerId,
+      'swapPairId': swapPairId,
       'pickupLatitude': pickupLatitude,
       'pickupLongitude': pickupLongitude,
       'deliveryLatitude': deliveryLatitude,
@@ -135,6 +149,9 @@ class DeliveryModel {
     String? itemImageUrl,
     String? providerName,
     String? receiverName,
+    String? ownerId,
+    String? partnerId,
+    String? swapPairId,
     double? pickupLatitude,
     double? pickupLongitude,
     double? deliveryLatitude,
@@ -160,6 +177,9 @@ class DeliveryModel {
       itemImageUrl: itemImageUrl ?? this.itemImageUrl,
       providerName: providerName ?? this.providerName,
       receiverName: receiverName ?? this.receiverName,
+      ownerId: ownerId ?? this.ownerId,
+      partnerId: partnerId ?? this.partnerId,
+      swapPairId: swapPairId ?? this.swapPairId,
       pickupLatitude: pickupLatitude ?? this.pickupLatitude,
       pickupLongitude: pickupLongitude ?? this.pickupLongitude,
       deliveryLatitude: deliveryLatitude ?? this.deliveryLatitude,

@@ -502,12 +502,132 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   }
 
   void _onNotificationTap(NotificationModel notification) {
+    // Mark as read if not already read
     if (!notification.isRead) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         _notificationService.markAsRead(user.uid, notification.id!);
       }
     }
+
+    // Navigate based on notification data
+    _navigateFromNotification(notification);
+  }
+
+  void _navigateFromNotification(NotificationModel notification) {
+    final data = notification.data;
+    if (data == null) return;
+
+    switch (notification.type) {
+      case 'Chat':
+        _navigateToChat(data);
+        break;
+      case 'Swaps':
+        _navigateToSwap(data);
+        break;
+      case 'Deliveries':
+        _navigateToDelivery(data);
+        break;
+      case 'Badges':
+        _navigateToAchievements();
+        break;
+      case 'Listings':
+        _navigateToProfile();
+        break;
+      case 'Wishlist':
+        _navigateToWishlist();
+        break;
+      case 'Login':
+        _navigateToProfile();
+        break;
+      default:
+        // For other types, just stay on notifications screen
+        break;
+    }
+  }
+
+  void _navigateToChat(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final senderId = data['senderId'] as String?;
+
+    if (chatId != null) {
+      Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: {'chatId': chatId, 'senderId': senderId},
+      );
+    }
+  }
+
+  void _navigateToSwap(Map<String, dynamic> data) {
+    final swapId = data['swapId'] as String?;
+    final action = data['action'] as String?;
+
+    if (swapId != null) {
+      if (action == 'view_swap') {
+        Navigator.pushNamed(
+          context,
+          '/swap-details',
+          arguments: {'swapId': swapId},
+        );
+      } else {
+        // Navigate to my swaps screen
+        Navigator.pushNamed(context, '/my-swaps');
+      }
+    }
+  }
+
+  void _navigateToDelivery(Map<String, dynamic> data) {
+    final swapId = data['swapId'] as String?;
+    final deliveryId = data['deliveryId'] as String?;
+
+    if (swapId != null) {
+      Navigator.pushNamed(
+        context,
+        '/enhanced-track-delivery',
+        arguments: {'swapId': swapId},
+      );
+    } else if (deliveryId != null) {
+      Navigator.pushNamed(
+        context,
+        '/track-delivery',
+        arguments: {'deliveryId': deliveryId},
+      );
+    }
+  }
+
+  void _navigateToAchievements() {
+    Navigator.pushNamed(context, '/achievements');
+  }
+
+  void _navigateToProfile() {
+    // Navigate back to main screen and then to profile tab
+    Navigator.pop(context); // Go back to browsing screen
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/browse',
+      (route) => false,
+      arguments: {
+        'userId': FirebaseAuth.instance.currentUser?.uid,
+        'initialTab': 3,
+      },
+    );
+  }
+
+  void _navigateToWishlist() {
+    // Navigate back to main screen and then to wishlist
+    Navigator.pop(context); // Go back to browsing screen
+    // The browsing screen will handle showing the wishlist tab
+    // We can pass a parameter to indicate which tab to show
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/browse',
+      (route) => false,
+      arguments: {
+        'userId': FirebaseAuth.instance.currentUser?.uid,
+        'initialTab': 1,
+      },
+    );
   }
 
   Future<void> _showClearAllDialog(String userId) async {

@@ -14,7 +14,8 @@ import 'listing_details_screen.dart';
 
 class BrowsingScreen extends StatefulWidget {
   final String userId;
-  const BrowsingScreen({super.key, required this.userId});
+  final int? initialTab;
+  const BrowsingScreen({super.key, required this.userId, this.initialTab});
 
   @override
   State<BrowsingScreen> createState() => _BrowsingScreenState();
@@ -59,6 +60,12 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
       uid == widget.userId,
       'UID mismatch: auth=$uid param=${widget.userId}',
     );
+
+    // Set initial tab if provided
+    if (widget.initialTab != null) {
+      _currentIndex = widget.initialTab!;
+    }
+
     _loadUserRole();
     _loadWishlist();
     _loadUserPreferences();
@@ -215,6 +222,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
           message: 'You added an item to your wishlist!',
           type: 'Wishlist',
           tag: '#Wishlist',
+          data: {'action': 'view_wishlist', 'listingId': listingId},
         );
       }
     } catch (e) {

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart';
 
 import '../models/message_model.dart';
 import '../services/swap_service.dart';
 import 'confirm_swap_screen.dart';
+import 'location_selection_modal.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -73,6 +75,11 @@ class _ChatScreenState extends State<ChatScreen> {
       color = const Color(0xFFEF4444); // Softer red
       text = 'Swap Declined';
       subtitle = 'This swap request was declined';
+    } else if (swap['status'] == 'ready_for_delivery') {
+      icon = Icons.local_shipping;
+      color = const Color(0xFF10B981); // Emerald green
+      text = 'Swap Completed';
+      subtitle = 'Both locations confirmed! Ready for delivery';
     } else if (swap['status'] == 'confirmed') {
       icon = Icons.check_circle_outline;
       color = const Color(0xFF10B981); // Emerald green
@@ -214,22 +221,170 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildLocationConfirmationBanner(Map<String, dynamic> swap) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return const SizedBox.shrink();
+
+    final status = swap['status'] ?? '';
+    final user01LocationConfirmed =
+        swap['user01LocationConfirmed'] as bool? ?? false;
+    final user02LocationConfirmed =
+        swap['user02LocationConfirmed'] as bool? ?? false;
+    final bothConfirmed = swap['bothConfirmed'] as bool? ?? false;
+
+    // Only show banner if swap is confirmed but both locations not confirmed
+    if (status != 'confirmed' || bothConfirmed) {
+      return const SizedBox.shrink();
+    }
+
+    // Check if current user needs to add location
+    final fromUserId = swap['fromUserId'] as String?;
+    final toUserId = swap['toUserId'] as String?;
+
+    bool needsLocation = false;
+    if (currentUserId == fromUserId && !user01LocationConfirmed) {
+      needsLocation = true;
+    } else if (currentUserId == toUserId && !user02LocationConfirmed) {
+      needsLocation = true;
+    }
+
+    if (!needsLocation) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF2D9D78).withOpacity(0.1),
+            const Color(0xFF10B981).withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF2D9D78).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2D9D78).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.location_on,
+              color: Color(0xFF2D9D78),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '📍 Please provide your delivery location',
+                  style: TextStyle(
+                    color: Color(0xFF2D9D78),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Add your location to complete the swap setup.',
+                  style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () => _showLocationSelectionModal(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2D9D78),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Give Location',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showLocationSelectionModal() async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null || widget.swapId == null) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          LocationSelectionModal(swapId: widget.swapId!, userId: currentUserId),
+    );
+
+    if (result == true && mounted) {
+      // Refresh the UI or show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location added successfully!'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    }
+  }
+
   Widget _buildAppBarTitleWithStatus(Map<String, dynamic> swap) {
     String status = swap['status'] ?? '';
+    String displayStatus = status;
+    Color statusColor = const Color(0xFF14B8A6); // Default teal
+
+    // Convert status to user-friendly display
+    switch (status) {
+      case 'ready_for_delivery':
+        displayStatus = 'COMPLETED';
+        statusColor = const Color(0xFF10B981); // Green
+        break;
+      case 'confirmed':
+        displayStatus = 'CONFIRMED';
+        statusColor = const Color(0xFF10B981); // Green
+        break;
+      case 'accepted':
+        displayStatus = 'ACCEPTED';
+        statusColor = const Color(0xFF14B8A6); // Teal
+        break;
+      case 'pending':
+        displayStatus = 'PENDING';
+        statusColor = const Color(0xFF06B6D4); // Cyan
+        break;
+      case 'rejected':
+        displayStatus = 'DECLINED';
+        statusColor = const Color(0xFFEF4444); // Red
+        break;
+    }
 
     return Row(
       children: [
         const Text('Chat', style: TextStyle(color: Color(0xFF0F172A))),
-        if (status.isNotEmpty) ...[
+        if (displayStatus.isNotEmpty) ...[
           const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFF14B8A6), // Teal
+              color: statusColor,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              status.toUpperCase(),
+              displayStatus,
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -311,6 +466,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 isAccepted,
                 isRejected,
               ),
+              _buildLocationConfirmationBanner(swap),
               Expanded(child: _buildChatBody()),
             ],
           ),

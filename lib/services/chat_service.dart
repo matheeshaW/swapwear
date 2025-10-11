@@ -100,21 +100,26 @@ class ChatService {
       final senderDoc = await _db.collection('users').doc(senderId).get();
       final senderName = senderDoc.data()?['name'] ?? 'Someone';
 
-      // Send notification to all participants except sender
+      // Send FCM notification to all participants except sender
       for (final participantId in participants) {
         if (participantId != senderId) {
-          await _notificationService.createNotification(
-            userId: participantId,
-            title: '💬 New Message from $senderName',
-            message: text.length > 50 ? '${text.substring(0, 50)}...' : text,
-            type: 'Chat',
-            tag: '#Chat',
-            data: {
-              'chatId': chatId,
-              'senderId': senderId,
-              'action': 'open_chat',
-            },
-          );
+          // Check if notifications are enabled for this user
+          final notificationsEnabled = await _notificationService
+              .areNotificationsEnabled(participantId);
+
+          if (notificationsEnabled) {
+            await _notificationService.sendFCMNotification(
+              targetUserId: participantId,
+              title: '💬 New Message from $senderName',
+              body: text.length > 50 ? '${text.substring(0, 50)}...' : text,
+              type: 'Chat',
+              data: {
+                'chatId': chatId,
+                'senderId': senderId,
+                'action': 'open_chat',
+              },
+            );
+          }
         }
       }
     } catch (e) {
