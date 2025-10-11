@@ -257,41 +257,13 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'Delivery Management',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const Spacer(),
-                      // Debug button
-                      IconButton(
-                        onPressed: () async {
-                          print('Debug: Testing delivery service...');
-                          try {
-                            final deliveries = await _deliveryService
-                                .streamProviderDeliveries(_providerId!)
-                                .first;
-                            print(
-                              'Debug: Found ${deliveries.length} deliveries',
-                            );
-                            for (final delivery in deliveries) {
-                              print(
-                                'Debug: Delivery - ${delivery.itemName} (${delivery.status})',
-                              );
-                            }
-                          } catch (e) {
-                            print('Debug: Error testing delivery service: $e');
-                          }
-                        },
-                        icon: const Icon(Icons.bug_report, size: 20),
-                        tooltip: 'Debug deliveries',
-                      ),
-                    ],
+                  const Text(
+                    'Delivery Management',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
                   const SizedBox(height: 16),
 

@@ -468,9 +468,7 @@ class _ConfirmSwapScreenState extends State<ConfirmSwapScreen> {
               ),
               maxLines: 2,
               onChanged: (value) {
-                if (value.trim().isNotEmpty) {
-                  _setManualLocation();
-                }
+                // Don't do anything on character change to avoid page refresh
               },
             ),
             const SizedBox(height: 12),
@@ -496,16 +494,15 @@ class _ConfirmSwapScreenState extends State<ConfirmSwapScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _locationController.text.trim().isNotEmpty
-                        ? () => _setManualLocation()
-                        : null,
+                    onPressed: () {
+                      if (_locationController.text.trim().isNotEmpty) {
+                        _setManualLocation();
+                      }
+                    },
                     icon: const Icon(Icons.check, size: 18),
                     label: const Text('Use Address'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          _locationController.text.trim().isNotEmpty
-                          ? const Color(0xFF2D9D78)
-                          : const Color(0xFF9CA3AF),
+                      backgroundColor: const Color(0xFF2D9D78),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
