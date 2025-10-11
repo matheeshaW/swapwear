@@ -163,6 +163,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     final hasCondition =
         selectedCondition != null && selectedCondition != 'All';
 
+    // Note: We'll filter for availability in the client-side code to handle
+    // existing listings that don't have the isAvailable field
+
     if (hasCategory) {
       query = query.where('category', isEqualTo: selectedCategory);
     }
@@ -589,10 +592,24 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   }
                   final docs = snapshot.data!.docs;
 
+                  // Filter for available listings (isAvailable: true OR isAvailable field doesn't exist)
+                  final availableDocs = docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final isAvailable = data['isAvailable'];
+                    // If isAvailable field doesn't exist, treat as available (for existing listings)
+                    return isAvailable != false; // true or null/undefined
+                  }).toList();
+
+                  if (availableDocs.isEmpty) {
+                    return const Center(
+                      child: Text('No available listings found.'),
+                    );
+                  }
+
                   // (filters detection reserved for future use)
 
                   // Start with a copy
-                  final sortedDocs = docs.toList();
+                  final sortedDocs = availableDocs.toList();
 
                   // Sort by number of preference matches (descending), then timestamp
                   sortedDocs.sort((a, b) {

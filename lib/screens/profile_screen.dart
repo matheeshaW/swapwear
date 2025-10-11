@@ -43,6 +43,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _toggleListingAvailability(
+    String listingId,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final currentAvailability = data['isAvailable'] ?? true;
+      final newAvailability = !currentAvailability;
+
+      await FirebaseFirestore.instance
+          .collection('listings')
+          .doc(listingId)
+          .update({'isAvailable': newAvailability});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newAvailability
+                  ? 'Listing marked as available'
+                  : 'Listing marked as not available',
+            ),
+          ),
+        );
+        setState(() {}); // Refresh UI
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update availability: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildMyListingsSection() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
@@ -130,6 +164,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Mark as Not Available button
+                        IconButton(
+                          icon: Icon(
+                            (data['isAvailable'] ?? true)
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: (data['isAvailable'] ?? true)
+                                ? Colors.orange
+                                : Colors.green,
+                          ),
+                          tooltip: (data['isAvailable'] ?? true)
+                              ? 'Mark as Not Available'
+                              : 'Mark as Available',
+                          onPressed: () async {
+                            await _toggleListingAvailability(listingId, data);
+                          },
+                        ),
                         IconButton(
                           icon: const Icon(Icons.edit, color: Colors.blue),
                           tooltip: 'Edit',
