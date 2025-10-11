@@ -12,6 +12,7 @@ import 'my_swaps_screen.dart';
 import 'provider_dashboard.dart';
 import 'eco_impact_dashboard.dart';
 import 'achievements_page.dart';
+import '../theme/colors.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -499,11 +500,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : () async {
                     try {
                       await FirebaseAuth.instance.signOut();
-                      if (mounted) {
+                      if (!mounted) return;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
                         Navigator.of(
                           context,
                         ).pushNamedAndRemoveUntil('/login', (route) => false);
-                      }
+                      });
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -596,15 +598,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           CircleAvatar(
                                             radius: 56,
                                             backgroundColor: Colors.grey[100],
-                                            backgroundImage: (pic.isNotEmpty)
-                                                ? NetworkImage(pic)
-                                                : null,
-                                            child: (pic.isEmpty)
-                                                ? const Icon(
+                                            backgroundImage:
+                                                null, // Remove NetworkImage
+                                            child: (pic.isNotEmpty)
+                                                ? ClipOval(
+                                                    child: CachedNetworkImage(
+                                                      imageUrl: pic,
+                                                      width: 112,
+                                                      height: 112,
+                                                      fit: BoxFit.cover,
+                                                      placeholder:
+                                                          (
+                                                            context,
+                                                            url,
+                                                          ) => Container(
+                                                            width: 112,
+                                                            height: 112,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade200,
+                                                            child: const Center(
+                                                              child: SizedBox(
+                                                                width: 24,
+                                                                height: 24,
+                                                                child:
+                                                                    CircularProgressIndicator(
+                                                                      strokeWidth:
+                                                                          2,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                      errorWidget:
+                                                          (
+                                                            context,
+                                                            url,
+                                                            error,
+                                                          ) => Container(
+                                                            width: 112,
+                                                            height: 112,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade200,
+                                                            child: const Icon(
+                                                              Icons.person,
+                                                              size: 56,
+                                                              color:
+                                                                  Colors.grey,
+                                                            ),
+                                                          ),
+                                                    ),
+                                                  )
+                                                : const Icon(
                                                     Icons.person,
                                                     size: 56,
-                                                  )
-                                                : null,
+                                                  ),
                                           ),
                                           Positioned(
                                             right: -6,
@@ -802,7 +850,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             height: 52,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                colors: [
+                                  AppColors.primary,
+                                  Color.fromARGB(255, 3, 117, 148),
+                                ],
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
                               ),
@@ -832,7 +883,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24),
                     ListTile(
                       leading: const Icon(Icons.swap_horiz),
-                      title: const Text('My Swaps'),
+                      title: const Text(
+                        'My Swap',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                       onTap: () {
                         Navigator.push(

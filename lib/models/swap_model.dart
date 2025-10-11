@@ -13,6 +13,7 @@ class SwapModel {
   final String chatId;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
+  final List<String>? deletedBy; // Track which users have deleted this swap
 
   const SwapModel({
     this.id,
@@ -24,6 +25,7 @@ class SwapModel {
     required this.chatId,
     this.createdAt,
     this.updatedAt,
+    this.deletedBy,
   });
 
   factory SwapModel.fromMap(Map<String, dynamic> map, String id) {
@@ -37,6 +39,9 @@ class SwapModel {
       chatId: map['chatId'] as String,
       createdAt: map['createdAt'] as Timestamp?,
       updatedAt: map['updatedAt'] as Timestamp?,
+      deletedBy: map['deletedBy'] != null
+          ? List<String>.from(map['deletedBy'] as List)
+          : null,
     );
   }
 
@@ -50,6 +55,7 @@ class SwapModel {
       'chatId': chatId,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'deletedBy': deletedBy,
     };
   }
 
@@ -63,6 +69,7 @@ class SwapModel {
     String? chatId,
     Timestamp? createdAt,
     Timestamp? updatedAt,
+    List<String>? deletedBy,
   }) {
     return SwapModel(
       id: id ?? this.id,
@@ -74,11 +81,12 @@ class SwapModel {
       chatId: chatId ?? this.chatId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      deletedBy: deletedBy ?? this.deletedBy,
     );
   }
 
   @override
   String toString() {
-    return 'SwapModel(id: $id, listingOfferedId: $listingOfferedId, listingRequestedId: $listingRequestedId, fromUserId: $fromUserId, toUserId: $toUserId, status: $status, chatId: $chatId, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'SwapModel(id: $id, listingOfferedId: $listingOfferedId, listingRequestedId: $listingRequestedId, fromUserId: $fromUserId, toUserId: $toUserId, status: $status, chatId: $chatId, createdAt: $createdAt, updatedAt: $updatedAt, deletedBy: $deletedBy)';
   }
 }

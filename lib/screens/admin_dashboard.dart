@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/admin_service.dart';
+import 'user_management_screen.dart';
+import 'user_management_utils.dart';
+import '../theme/colors.dart';
 import '../services/analytics_service.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -39,89 +42,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _loading = false;
       });
     }
-  }
-
-  void _editUserDialog(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    final email = (data['email'] ?? doc.id) as String;
-    final nameCtrl = TextEditingController(text: data['name'] ?? '');
-    final prefs = (data['preferences'] as List<dynamic>? ?? []).cast<String>();
-    final prefsCtrl = TextEditingController(text: prefs.join(', '));
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Edit $email'),
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'User ID',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: SelectableText(doc.id, maxLines: 1),
-                    ),
-                    IconButton(
-                      tooltip: 'Copy UID',
-                      icon: const Icon(Icons.copy),
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: doc.id));
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('User ID copied')),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                TextField(
-                  controller: prefsCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Preferences (comma separated)',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final list = prefsCtrl.text
-                    .split(',')
-                    .map((e) => e.trim())
-                    .where((e) => e.isNotEmpty)
-                    .toList();
-                await _adminService.updateUser(doc.id, {
-                  'name': nameCtrl.text.trim(),
-                  'preferences': list,
-                });
-                if (mounted) Navigator.pop(context);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _addAdminDialog() {
@@ -240,11 +160,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 52,
+                height: 56,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                    colors: [
+                      AppColors.primary,
+                      Color.fromARGB(255, 3, 117, 148),
+                    ],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -266,21 +189,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    minimumSize: const Size.fromHeight(52),
+                    minimumSize: const Size.fromHeight(56),
                   ),
                   onPressed: () {
-                    setState(() {
-                      _showUserManagement = !_showUserManagement;
-                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const UserManagementScreen(),
+                      ),
+                    );
                   },
                 ),
               ),
               Container(
-                height: 52,
+                height: 56,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF764ba2), Color(0xFF667eea)],
+                    colors: [
+                      AppColors.primary,
+                      Color.fromARGB(255, 3, 117, 148),
+                    ],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -305,7 +234,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    minimumSize: const Size.fromHeight(52),
+                    minimumSize: const Size.fromHeight(56),
                   ),
                   onPressed: _addAdminDialog,
                 ),
@@ -421,47 +350,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 children: [
                                   IconButton(
                                     tooltip: 'Edit',
-                                    onPressed: () =>
-                                        _editUserDialog(docs[index]),
+                                    onPressed: () => editUserDialog(
+                                      context: context,
+                                      doc: docs[index],
+                                      adminService: _adminService,
+                                      onUserUpdated: () {
+                                        // No specific action needed here for now
+                                      },
+                                    ),
                                     icon: const Icon(Icons.edit_outlined),
                                   ),
                                   IconButton(
                                     tooltip: 'Delete',
                                     onPressed: () async {
-                                      final confirmed =
-                                          await showDialog<bool>(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text(
-                                                'Deactivate user?',
-                                              ),
-                                              content: Text(
-                                                'This will delete profile for $uid.',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        false,
-                                                      ),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                ElevatedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                        true,
-                                                      ),
-                                                  child: const Text('Delete'),
-                                                ),
-                                              ],
-                                            ),
-                                          ) ??
-                                          false;
-                                      if (confirmed) {
-                                        await _adminService.deleteUser(uid);
-                                      }
+                                      await confirmDeleteUser(
+                                        context: context,
+                                        uid: uid,
+                                        adminService: _adminService,
+                                        onUserDeleted: () {
+                                          // No specific action needed here for now
+                                        },
+                                      );
                                     },
                                     icon: const Icon(Icons.delete_outline),
                                   ),
