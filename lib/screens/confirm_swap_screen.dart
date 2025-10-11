@@ -234,7 +234,7 @@ class _ConfirmSwapScreenState extends State<ConfirmSwapScreen> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Condition: $condition',
+                            '$condition',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[700],
