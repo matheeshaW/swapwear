@@ -52,6 +52,14 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
           FirebaseAuth.instance.currentUser?.uid ?? '',
         ),
         builder: (context, snapshot) {
+          print(
+            'Track Delivery - StreamBuilder: SwapId: ${widget.swapId}, UserId: ${FirebaseAuth.instance.currentUser?.uid}, Connection State: ${snapshot.connectionState}, Has Data: ${snapshot.hasData}',
+          );
+
+          if (snapshot.hasError) {
+            print('Track Delivery - StreamBuilder Error: ${snapshot.error}');
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(color: Color(0xFF10B981)),
@@ -59,10 +67,14 @@ class _TrackDeliveryPageState extends State<TrackDeliveryPage> {
           }
 
           if (!snapshot.hasData || snapshot.data == null) {
+            print('Track Delivery - No delivery data found');
             return _buildNoDeliveryAvailable();
           }
 
           final delivery = snapshot.data!;
+          print(
+            'Track Delivery - Found delivery: ${delivery.itemName} (${delivery.status})',
+          );
           return _buildDeliveryTracking(delivery);
         },
       ),

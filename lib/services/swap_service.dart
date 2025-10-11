@@ -131,6 +131,183 @@ class SwapService {
     }
   }
 
+  // Add location for a user in a swap
+  Future<void> addUserLocation({
+    required String swapId,
+    required String userId,
+    required double latitude,
+    required double longitude,
+    required String address,
+  }) async {
+    try {
+      final swapDoc = await _db.collection('swaps').doc(swapId).get();
+      if (!swapDoc.exists) {
+        throw Exception('Swap not found');
+      }
+
+      final swapData = swapDoc.data()!;
+      final fromUserId = swapData['fromUserId'] as String;
+      final toUserId = swapData['toUserId'] as String;
+
+      // Determine which user this is (user01 or user02)
+      final isUser01 = userId == fromUserId;
+      final locationField = isUser01 ? 'user01Location' : 'user02Location';
+      final confirmedField = isUser01
+          ? 'user01LocationConfirmed'
+          : 'user02LocationConfirmed';
+
+      // Create location data
+      final locationData = {
+        'lat': latitude,
+        'lng': longitude,
+        'address': address,
+      };
+
+      // Update the swap with location data and confirmation status
+      await _db.collection('swaps').doc(swapId).update({
+        locationField: locationData,
+        confirmedField: true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Check if both users have confirmed their locations
+      await _checkAndUpdateSwapStatus(swapId, fromUserId, toUserId);
+
+      // Send notification to the other user
+      final otherUserId = isUser01 ? toUserId : fromUserId;
+      await _notificationService.createNotification(
+        userId: otherUserId,
+        title: 'Location Confirmed!',
+        message:
+            'Your swap partner has confirmed their location. Please add yours to complete the swap.',
+        type: 'Swaps',
+        tag: '#LocationConfirmed',
+        data: {'swapId': swapId, 'action': 'add_location'},
+      );
+    } catch (e) {
+      throw Exception('Failed to add user location: $e');
+    }
+  }
+
+  // Check if both users have confirmed locations and update status
+  Future<void> _checkAndUpdateSwapStatus(
+    String swapId,
+    String fromUserId,
+    String toUserId,
+  ) async {
+    try {
+      final swapDoc = await _db.collection('swaps').doc(swapId).get();
+      if (!swapDoc.exists) return;
+
+      final swapData = swapDoc.data()!;
+      final user01LocationConfirmed =
+          swapData['user01LocationConfirmed'] as bool? ?? false;
+      final user02LocationConfirmed =
+          swapData['user02LocationConfirmed'] as bool? ?? false;
+
+      // Check if both users have confirmed their locations
+      if (user01LocationConfirmed && user02LocationConfirmed) {
+        // Both users have confirmed locations, update status
+        await _db.collection('swaps').doc(swapId).update({
+          'bothConfirmed': true,
+          'deliveryStatus': 'InProgress',
+          'status': 'ready_for_delivery',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Send notification to both users
+        await _notificationService.createNotification(
+          userId: fromUserId,
+          title: '🚚 Delivery Ready!',
+          message: 'Both locations confirmed! Your swap is ready for delivery.',
+          type: 'Swaps',
+          tag: '#ReadyForDelivery',
+          data: {'swapId': swapId, 'action': 'view_swap'},
+        );
+
+        await _notificationService.createNotification(
+          userId: toUserId,
+          title: '🚚 Delivery Ready!',
+          message: 'Both locations confirmed! Your swap is ready for delivery.',
+          type: 'Swaps',
+          tag: '#ReadyForDelivery',
+          data: {'swapId': swapId, 'action': 'view_swap'},
+        );
+
+        // Create delivery records for both users
+        await _createDeliveryRecords(swapId, fromUserId, toUserId);
+      }
+    } catch (e) {
+      print('Error checking swap status: $e');
+    }
+  }
+
+  // Create delivery records when both locations are confirmed
+  Future<void> _createDeliveryRecords(
+    String swapId,
+    String fromUserId,
+    String toUserId,
+  ) async {
+    try {
+      // Get listing details
+      final swapDoc = await _db.collection('swaps').doc(swapId).get();
+      final swapData = swapDoc.data()!;
+
+      final user01Location =
+          swapData['user01Location'] as Map<String, dynamic>?;
+      final user02Location =
+          swapData['user02Location'] as Map<String, dynamic>?;
+
+      if (user01Location == null || user02Location == null) {
+        print('Error: Missing location data for swap $swapId');
+        return;
+      }
+
+      final offeredListingDoc = await _db
+          .collection('listings')
+          .doc(swapData['listingOfferedId'])
+          .get();
+      final requestedListingDoc = await _db
+          .collection('listings')
+          .doc(swapData['listingRequestedId'])
+          .get();
+
+      if (offeredListingDoc.exists && requestedListingDoc.exists) {
+        final offeredData = offeredListingDoc.data()!;
+        final requestedData = requestedListingDoc.data()!;
+
+        // Get user details
+        final fromUserDoc = await _db.collection('users').doc(fromUserId).get();
+        final toUserDoc = await _db.collection('users').doc(toUserId).get();
+
+        // Create dual delivery records
+        await _deliveryService.createDualDeliveries(
+          swapId: swapId,
+          fromUserId: fromUserId,
+          toUserId: toUserId,
+          fromItemName: offeredData['title'] ?? 'Unknown Item',
+          toItemName: requestedData['title'] ?? 'Unknown Item',
+          providerId: fromUserId, // Assuming fromUserId is the provider
+          currentLocation: 'Location to be selected',
+          estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
+          fromItemImageUrl: offeredData['imageUrl'],
+          toItemImageUrl: requestedData['imageUrl'],
+          providerName: fromUserDoc.data()?['name'] ?? 'Provider',
+          fromUserName: fromUserDoc.data()?['name'] ?? 'Provider',
+          toUserName: toUserDoc.data()?['name'] ?? 'Receiver',
+          pickupLatitude: user01Location['lat']?.toDouble(),
+          pickupLongitude: user01Location['lng']?.toDouble(),
+          deliveryLatitude: user02Location['lat']?.toDouble(),
+          deliveryLongitude: user02Location['lng']?.toDouble(),
+          pickupAddress: user01Location['address'],
+          deliveryAddress: user02Location['address'],
+        );
+      }
+    } catch (e) {
+      print('Error creating delivery records: $e');
+    }
+  }
+
   Future<void> confirmSwap(String swapId) async {
     try {
       // Get swap details first
@@ -153,89 +330,26 @@ class SwapService {
       await _notificationService.createNotification(
         userId: fromUserId,
         title: 'Swap Confirmed!',
-        message: 'Your swap has been confirmed and delivery is being arranged.',
+        message:
+            'Your swap has been confirmed. Please add your location to complete the setup.',
         type: 'Swaps',
         tag: '#Confirmed',
-        data: {'swapId': swapId, 'action': 'view_swap'},
+        data: {'swapId': swapId, 'action': 'add_location'},
       );
 
       await _notificationService.createNotification(
         userId: toUserId,
         title: 'Swap Confirmed!',
-        message: 'Your swap has been confirmed and delivery is being arranged.',
+        message:
+            'Your swap has been confirmed. Please add your location to complete the setup.',
         type: 'Swaps',
         tag: '#Confirmed',
-        data: {'swapId': swapId, 'action': 'view_swap'},
+        data: {'swapId': swapId, 'action': 'add_location'},
       );
 
-      // Get listing details for the offered item
-      final offeredListingDoc = await _db
-          .collection('listings')
-          .doc(swapData['listingOfferedId'])
-          .get();
-
-      if (offeredListingDoc.exists) {
-        final offeredData = offeredListingDoc.data()!;
-
-        // Get user details for provider and receiver
-        final providerDoc = await _db
-            .collection('users')
-            .doc(swapData['fromUserId'])
-            .get();
-        final receiverDoc = await _db
-            .collection('users')
-            .doc(swapData['toUserId'])
-            .get();
-
-        // Get listing details for the requested item
-        final requestedListingDoc = await _db
-            .collection('listings')
-            .doc(swapData['listingRequestedId'])
-            .get();
-
-        // Create dual delivery records (one for each user)
-        await _deliveryService.createDualDeliveries(
-          swapId: swapId,
-          fromUserId: swapData['fromUserId'],
-          toUserId: swapData['toUserId'],
-          fromItemName: offeredData['title'] ?? 'Unknown Item',
-          toItemName: requestedListingDoc.data()?['title'] ?? 'Unknown Item',
-          providerId:
-              swapData['fromUserId'], // Assuming fromUserId is the provider
-          currentLocation: 'Location to be selected',
-          estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
-          fromItemImageUrl: offeredData['imageUrl'],
-          toItemImageUrl: requestedListingDoc.data()?['imageUrl'],
-          providerName: providerDoc.data()?['name'] ?? 'Provider',
-          fromUserName: providerDoc.data()?['name'] ?? 'Provider',
-          toUserName: receiverDoc.data()?['name'] ?? 'Receiver',
-        );
-
-        // Create delivery notifications for each user's specific item
-        await _notificationService.createNotification(
-          userId: fromUserId,
-          title: 'Delivery Started',
-          message:
-              'Your "${offeredData['title'] ?? 'item'}" is now being prepared for delivery.',
-          type: 'Deliveries',
-          tag: '#InTransit',
-          data: {'swapId': swapId, 'action': 'track_delivery'},
-        );
-
-        await _notificationService.createNotification(
-          userId: toUserId,
-          title: 'Delivery Started',
-          message:
-              'Your "${requestedListingDoc.data()?['title'] ?? 'item'}" is now being prepared for delivery.',
-          type: 'Deliveries',
-          tag: '#InTransit',
-          data: {'swapId': swapId, 'action': 'track_delivery'},
-        );
-
-        // Award achievements for both users
-        await _awardSwapAchievements(fromUserId);
-        await _awardSwapAchievements(toUserId);
-      }
+      // Award achievements for both users
+      await _awardSwapAchievements(fromUserId);
+      await _awardSwapAchievements(toUserId);
     } catch (e) {
       throw Exception('Failed to confirm swap: $e');
     }

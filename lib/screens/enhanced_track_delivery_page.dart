@@ -53,6 +53,16 @@ class _EnhancedTrackDeliveryPageState extends State<EnhancedTrackDeliveryPage> {
       body: StreamBuilder<DeliveryModel?>(
         stream: _deliveryService.streamDeliveryBySwapId(widget.swapId),
         builder: (context, snapshot) {
+          print(
+            'Enhanced Track Delivery - StreamBuilder: SwapId: ${widget.swapId}, Connection State: ${snapshot.connectionState}, Has Data: ${snapshot.hasData}',
+          );
+
+          if (snapshot.hasError) {
+            print(
+              'Enhanced Track Delivery - StreamBuilder Error: ${snapshot.error}',
+            );
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(color: Color(0xFF10B981)),
@@ -60,10 +70,14 @@ class _EnhancedTrackDeliveryPageState extends State<EnhancedTrackDeliveryPage> {
           }
 
           if (!snapshot.hasData || snapshot.data == null) {
+            print('Enhanced Track Delivery - No delivery data found');
             return _buildNoDeliveryAvailable();
           }
 
           final delivery = snapshot.data!;
+          print(
+            'Enhanced Track Delivery - Found delivery: ${delivery.itemName} (${delivery.status})',
+          );
           return _buildDeliveryTracking(delivery);
         },
       ),

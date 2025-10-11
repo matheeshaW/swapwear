@@ -9,11 +9,19 @@ class SwapModel {
   final String fromUserId;
   final String toUserId;
   final String
-  status; // "pending" | "accepted" | "confirmed" | "rejected" | "completed"
+  status; // "pending" | "accepted" | "confirmed" | "ready_for_delivery" | "rejected" | "completed"
   final String chatId;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
   final List<String>? deletedBy; // Track which users have deleted this swap
+
+  // Dual location fields
+  final Map<String, dynamic>? user01Location; // {lat, lng, address}
+  final Map<String, dynamic>? user02Location; // {lat, lng, address}
+  final bool user01LocationConfirmed;
+  final bool user02LocationConfirmed;
+  final bool bothConfirmed;
+  final String deliveryStatus; // "Pending" | "InProgress" | "Completed"
 
   const SwapModel({
     this.id,
@@ -26,6 +34,12 @@ class SwapModel {
     this.createdAt,
     this.updatedAt,
     this.deletedBy,
+    this.user01Location,
+    this.user02Location,
+    this.user01LocationConfirmed = false,
+    this.user02LocationConfirmed = false,
+    this.bothConfirmed = false,
+    this.deliveryStatus = 'Pending',
   });
 
   factory SwapModel.fromMap(Map<String, dynamic> map, String id) {
@@ -42,6 +56,12 @@ class SwapModel {
       deletedBy: map['deletedBy'] != null
           ? List<String>.from(map['deletedBy'] as List)
           : null,
+      user01Location: map['user01Location'] as Map<String, dynamic>?,
+      user02Location: map['user02Location'] as Map<String, dynamic>?,
+      user01LocationConfirmed: map['user01LocationConfirmed'] as bool? ?? false,
+      user02LocationConfirmed: map['user02LocationConfirmed'] as bool? ?? false,
+      bothConfirmed: map['bothConfirmed'] as bool? ?? false,
+      deliveryStatus: map['deliveryStatus'] as String? ?? 'Pending',
     );
   }
 
@@ -56,6 +76,12 @@ class SwapModel {
       'createdAt': createdAt,
       'updatedAt': updatedAt,
       'deletedBy': deletedBy,
+      'user01Location': user01Location,
+      'user02Location': user02Location,
+      'user01LocationConfirmed': user01LocationConfirmed,
+      'user02LocationConfirmed': user02LocationConfirmed,
+      'bothConfirmed': bothConfirmed,
+      'deliveryStatus': deliveryStatus,
     };
   }
 
@@ -70,6 +96,12 @@ class SwapModel {
     Timestamp? createdAt,
     Timestamp? updatedAt,
     List<String>? deletedBy,
+    Map<String, dynamic>? user01Location,
+    Map<String, dynamic>? user02Location,
+    bool? user01LocationConfirmed,
+    bool? user02LocationConfirmed,
+    bool? bothConfirmed,
+    String? deliveryStatus,
   }) {
     return SwapModel(
       id: id ?? this.id,
@@ -82,11 +114,19 @@ class SwapModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedBy: deletedBy ?? this.deletedBy,
+      user01Location: user01Location ?? this.user01Location,
+      user02Location: user02Location ?? this.user02Location,
+      user01LocationConfirmed:
+          user01LocationConfirmed ?? this.user01LocationConfirmed,
+      user02LocationConfirmed:
+          user02LocationConfirmed ?? this.user02LocationConfirmed,
+      bothConfirmed: bothConfirmed ?? this.bothConfirmed,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
     );
   }
 
   @override
   String toString() {
-    return 'SwapModel(id: $id, listingOfferedId: $listingOfferedId, listingRequestedId: $listingRequestedId, fromUserId: $fromUserId, toUserId: $toUserId, status: $status, chatId: $chatId, createdAt: $createdAt, updatedAt: $updatedAt, deletedBy: $deletedBy)';
+    return 'SwapModel(id: $id, listingOfferedId: $listingOfferedId, listingRequestedId: $listingRequestedId, fromUserId: $fromUserId, toUserId: $toUserId, status: $status, chatId: $chatId, createdAt: $createdAt, updatedAt: $updatedAt, deletedBy: $deletedBy, user01Location: $user01Location, user02Location: $user02Location, user01LocationConfirmed: $user01LocationConfirmed, user02LocationConfirmed: $user02LocationConfirmed, bothConfirmed: $bothConfirmed, deliveryStatus: $deliveryStatus)';
   }
 }

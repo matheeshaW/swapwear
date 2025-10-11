@@ -16,7 +16,7 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
   String? _providerId;
   bool _isLoading = true;
   int _selectedDeliveryTab =
-      0; // 0: All, 1: Pending, 2: Approved, 3: Out for Delivery, 4: Completed
+      0; // 0: All, 1: Pending, 2: Approved, 3: Picked Up, 4: In Transit, 5: Delivered
   final _deliveryService = DeliveryService();
 
   @override
@@ -256,13 +256,41 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Delivery Management',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'Delivery Management',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const Spacer(),
+                      // Debug button
+                      IconButton(
+                        onPressed: () async {
+                          print('Debug: Testing delivery service...');
+                          try {
+                            final deliveries = await _deliveryService
+                                .streamProviderDeliveries(_providerId!)
+                                .first;
+                            print(
+                              'Debug: Found ${deliveries.length} deliveries',
+                            );
+                            for (final delivery in deliveries) {
+                              print(
+                                'Debug: Delivery - ${delivery.itemName} (${delivery.status})',
+                              );
+                            }
+                          } catch (e) {
+                            print('Debug: Error testing delivery service: $e');
+                          }
+                        },
+                        icon: const Icon(Icons.bug_report, size: 20),
+                        tooltip: 'Debug deliveries',
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
@@ -343,9 +371,11 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         return Icons.schedule;
       case 'approved':
         return Icons.check_circle_outline;
-      case 'out for delivery':
+      case 'picked up':
+        return Icons.inventory_2;
+      case 'in transit':
         return Icons.local_shipping;
-      case 'completed':
+      case 'delivered':
         return Icons.check_circle;
       default:
         return Icons.info_outline;
@@ -463,9 +493,11 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         return const Color(0xFFF59E0B);
       case 'approved':
         return const Color(0xFF3B82F6);
-      case 'out for delivery':
+      case 'picked up':
         return const Color(0xFF8B5CF6);
-      case 'completed':
+      case 'in transit':
+        return const Color(0xFF7C3AED);
+      case 'delivered':
         return const Color(0xFF10B981);
       default:
         return const Color(0xFF6B7280);
@@ -478,8 +510,9 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
       'All',
       'Pending',
       'Approved',
-      'Out for Delivery',
-      'Completed',
+      'Picked Up',
+      'In Transit',
+      'Delivered',
     ];
 
     return SingleChildScrollView(
@@ -536,6 +569,10 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         print(
           'Provider Dashboard - StreamBuilder: Provider ID: $_providerId, Connection State: ${snapshot.connectionState}, Has Data: ${snapshot.hasData}, Data Length: ${snapshot.data?.length ?? 0}',
         );
+
+        if (snapshot.hasError) {
+          print('Provider Dashboard - StreamBuilder Error: ${snapshot.error}');
+        }
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: Padding(
@@ -624,13 +661,17 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         return deliveries
             .where((d) => d.status.toLowerCase() == 'approved')
             .toList();
-      case 3: // Out for Delivery
+      case 3: // Picked Up
         return deliveries
-            .where((d) => d.status.toLowerCase() == 'out for delivery')
+            .where((d) => d.status.toLowerCase() == 'picked up')
             .toList();
-      case 4: // Completed
+      case 4: // In Transit
         return deliveries
-            .where((d) => d.status.toLowerCase() == 'completed')
+            .where((d) => d.status.toLowerCase() == 'in transit')
+            .toList();
+      case 5: // Delivered
+        return deliveries
+            .where((d) => d.status.toLowerCase() == 'delivered')
             .toList();
       default:
         return deliveries;
@@ -647,8 +688,10 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
       case 2:
         return Icons.check_circle_outline;
       case 3:
-        return Icons.local_shipping;
+        return Icons.inventory_2;
       case 4:
+        return Icons.local_shipping;
+      case 5:
         return Icons.check_circle;
       default:
         return Icons.list;

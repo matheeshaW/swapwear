@@ -255,19 +255,26 @@ class DeliveryService {
 
   // Stream delivery by swap ID
   Stream<DeliveryModel?> streamDeliveryBySwapId(String swapId) {
-    return _deliveries
-        .where('swapId', isEqualTo: swapId)
-        .limit(1)
-        .snapshots()
-        .map((snapshot) {
-          if (snapshot.docs.isNotEmpty) {
-            return DeliveryModel.fromMap(
-              snapshot.docs.first.data(),
-              snapshot.docs.first.id,
-            );
-          }
-          return null;
-        });
+    print('DeliveryService - Streaming delivery by swap ID: $swapId');
+    return _deliveries.where('swapId', isEqualTo: swapId).limit(1).snapshots().map((
+      snapshot,
+    ) {
+      print(
+        'DeliveryService - Found ${snapshot.docs.length} deliveries for swapId: $swapId',
+      );
+      if (snapshot.docs.isNotEmpty) {
+        final delivery = DeliveryModel.fromMap(
+          snapshot.docs.first.data(),
+          snapshot.docs.first.id,
+        );
+        print(
+          'DeliveryService - Found delivery: ${delivery.itemName} (${delivery.status})',
+        );
+        return delivery;
+      }
+      print('DeliveryService - No deliveries found for swapId: $swapId');
+      return null;
+    });
   }
 
   // Stream delivery by swap ID and owner ID (for dual delivery system)
@@ -275,10 +282,20 @@ class DeliveryService {
     String swapId,
     String ownerId,
   ) {
-    return _deliveries.doc('${swapId}_$ownerId').snapshots().map((doc) {
+    final docId = '${swapId}_$ownerId';
+    print('DeliveryService - Streaming delivery by swap and owner: $docId');
+    return _deliveries.doc(docId).snapshots().map((doc) {
+      print(
+        'DeliveryService - Document exists: ${doc.exists} for docId: $docId',
+      );
       if (doc.exists) {
-        return DeliveryModel.fromMap(doc.data()!, doc.id);
+        final delivery = DeliveryModel.fromMap(doc.data()!, doc.id);
+        print(
+          'DeliveryService - Found delivery: ${delivery.itemName} (${delivery.status})',
+        );
+        return delivery;
       }
+      print('DeliveryService - No delivery found for docId: $docId');
       return null;
     });
   }
@@ -311,15 +328,29 @@ class DeliveryService {
     print('DeliveryService - Querying deliveries for provider: $providerId');
     return _deliveries
         .where('providerId', isEqualTo: providerId)
-        .orderBy('lastUpdated', descending: true)
         .snapshots()
         .map((snapshot) {
           print(
             'DeliveryService - Found ${snapshot.docs.length} deliveries for provider: $providerId',
           );
-          return snapshot.docs
+          final deliveries = snapshot.docs
               .map((doc) => DeliveryModel.fromMap(doc.data(), doc.id))
               .toList();
+
+          // Sort by lastUpdated descending locally
+          deliveries.sort((a, b) {
+            final aTime = a.lastUpdated ?? DateTime(1970);
+            final bTime = b.lastUpdated ?? DateTime(1970);
+            return bTime.compareTo(aTime);
+          });
+
+          return deliveries;
+        })
+        .handleError((error) {
+          print(
+            'DeliveryService - Error streaming provider deliveries: $error',
+          );
+          return <DeliveryModel>[];
         });
   }
 
@@ -376,15 +407,19 @@ class DeliveryService {
         updateData['currentLocation'] = currentLocation;
       }
 
+      // Update only the specific delivery
       await _deliveries.doc(deliveryId).update(updateData);
+      print(
+        'DeliveryService - Updated delivery: $deliveryId to status: $newStatus',
+      );
 
-      // Send targeted notification to the owner of the delivery record
+      // Get delivery data for notifications
       final deliveryDoc = await _deliveries.doc(deliveryId).get();
       if (deliveryDoc.exists) {
         final deliveryData = deliveryDoc.data()!;
-        final ownerId = deliveryData['ownerId'] as String?;
         final itemName = deliveryData['itemName'] as String?;
         final swapId = deliveryData['swapId'] as String?;
+        final ownerId = deliveryData['ownerId'] as String?;
 
         String title;
         String message;
@@ -397,16 +432,22 @@ class DeliveryService {
                 'Your delivery for "$itemName" has been approved and is being prepared.';
             tag = '#Approved';
             break;
-          case 'Out for Delivery':
+          case 'Picked Up':
+            title = 'Item Picked Up';
+            message =
+                'Your item "$itemName" has been picked up and is on its way!';
+            tag = '#PickedUp';
+            break;
+          case 'In Transit':
             title = 'Out for Delivery';
             message = 'Your item "$itemName" is now out for delivery!';
-            tag = '#OutForDelivery';
+            tag = '#InTransit';
             break;
-          case 'Completed':
+          case 'Delivered':
             title = 'Delivery Completed';
             message =
                 'Your delivery for "$itemName" has been completed successfully!';
-            tag = '#Completed';
+            tag = '#Delivered';
             break;
           default:
             title = 'Delivery Update';
@@ -414,7 +455,7 @@ class DeliveryService {
             tag = '#Updated';
         }
 
-        // Send notification only to the owner of this delivery record
+        // Send notification to the owner of this specific delivery
         if (ownerId != null) {
           await _notificationService.createNotification(
             userId: ownerId,
@@ -423,11 +464,13 @@ class DeliveryService {
             type: 'Deliveries',
             tag: tag,
             data: {
-              'deliveryId': deliveryId,
               'swapId': swapId,
+              'deliveryId': deliveryId,
+              'status': newStatus,
               'action': 'track_delivery',
             },
           );
+          print('DeliveryService - Sent notification to owner: $ownerId');
         }
       }
     } catch (e) {
@@ -460,72 +503,7 @@ class DeliveryService {
       if (status != null) {
         final deliveryDoc = await _deliveries.doc(deliveryId).get();
         if (deliveryDoc.exists) {
-          final deliveryData = deliveryDoc.data()!;
-          final providerId = deliveryData['providerId'] as String?;
-          final receiverId = deliveryData['receiverId'] as String?;
-          final itemName = deliveryData['itemName'] as String?;
-
-          String title;
-          String message;
-          String tag;
-
-          switch (status) {
-            case 'Approved':
-              title = 'Delivery Approved';
-              message =
-                  'Your delivery for $itemName has been approved and is being prepared.';
-              tag = '#Approved';
-              break;
-            case 'Out for Delivery':
-              title = 'Out for Delivery';
-              message = 'Your item $itemName is now out for delivery!';
-              tag = '#OutForDelivery';
-              break;
-            case 'Completed':
-              title = 'Delivery Completed';
-              message =
-                  'Your delivery for $itemName has been completed successfully!';
-              tag = '#Completed';
-              break;
-            default:
-              title = 'Delivery Update';
-              message = 'Your delivery status has been updated to $status.';
-              tag = '#Updated';
-          }
-
-          // Get swapId for navigation
-          final swapId = deliveryData['swapId'] as String?;
-
-          // Notify both provider and receiver
-          if (providerId != null) {
-            await _notificationService.createNotification(
-              userId: providerId,
-              title: title,
-              message: message,
-              type: 'Deliveries',
-              tag: tag,
-              data: {
-                'deliveryId': deliveryId,
-                'swapId': swapId,
-                'action': 'track_delivery',
-              },
-            );
-          }
-
-          if (receiverId != null) {
-            await _notificationService.createNotification(
-              userId: receiverId,
-              title: title,
-              message: message,
-              type: 'Deliveries',
-              tag: tag,
-              data: {
-                'deliveryId': deliveryId,
-                'swapId': swapId,
-                'action': 'track_delivery',
-              },
-            );
-          }
+          // Delivery updated successfully
         }
       }
     } catch (e) {
@@ -547,8 +525,8 @@ class DeliveryService {
     try {
       // Update delivery status to completed
       await _deliveries.doc(deliveryId).update({
-        'status': 'Completed',
-        'completedAt': FieldValue.serverTimestamp(),
+        'status': 'Delivered',
+        'deliveredAt': FieldValue.serverTimestamp(),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
 
