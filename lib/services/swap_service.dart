@@ -294,8 +294,7 @@ class SwapService {
           toUserId: toUserId,
           fromItemName: offeredData['title'] ?? 'Unknown Item',
           toItemName: requestedData['title'] ?? 'Unknown Item',
-          providerId:
-              mainProviderId, // Use the main provider ID for all deliveries
+          providerId: mainProviderId,
           currentLocation: 'Location to be selected',
           estimatedDelivery: DateTime.now().add(const Duration(days: 3)),
           fromItemImageUrl: offeredData['imageUrl'],

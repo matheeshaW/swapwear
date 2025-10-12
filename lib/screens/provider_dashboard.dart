@@ -58,6 +58,24 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
             'Provider Dashboard - User doc not found, Provider ID set to: $_providerId',
           );
         }
+
+        // Debug: Check all deliveries in the system
+        print('Provider Dashboard - Checking all deliveries in system...');
+        final allDeliveries = await _deliveryService
+            .streamAllDeliveries()
+            .first;
+        print(
+          'Provider Dashboard - Total deliveries in system: ${allDeliveries.length}',
+        );
+
+        for (final delivery in allDeliveries) {
+          print('Provider Dashboard - Delivery: ${delivery.id}');
+          print('  - Item: ${delivery.itemName}');
+          print('  - Owner: ${delivery.receiverName}');
+          print('  - Status: ${delivery.status}');
+          print('  - Pickup: ${delivery.pickupAddress ?? "TBD"}');
+          print('  - Deliver to: ${delivery.deliveryAddress ?? "TBD"}');
+        }
       } catch (e) {
         print('Provider Dashboard - Error loading provider data: $e');
         setState(() {
@@ -835,6 +853,23 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
                   'Owner: ${delivery.receiverName}',
                   style: const TextStyle(
                     fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 2),
+
+                // Delivery details - show correct pickup and delivery for this specific item
+                Text(
+                  'Pickup: ${delivery.pickupAddress ?? "Location TBD"}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+                Text(
+                  'Deliver to: ${delivery.deliveryAddress ?? "Location TBD"}',
+                  style: const TextStyle(
+                    fontSize: 12,
                     color: Color(0xFF6B7280),
                   ),
                 ),
