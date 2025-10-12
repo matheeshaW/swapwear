@@ -14,23 +14,51 @@ class AnalyticsService {
     }
   }
 
-  // Get active users count (users who made swaps in last 30 days)
+  // Get active users count (users who have been active in last 7 days)
   Future<int> getActiveUsers() async {
     try {
+      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+
+      // Get users who have been active in the last 7 days
+      // This includes users who have made swaps, logged in, or performed any activity
+      final usersSnapshot = await _db
+          .collection('users')
+          .where(
+            'lastActiveAt',
+            isGreaterThan: Timestamp.fromDate(sevenDaysAgo),
+          )
+          .get();
+
+      if (usersSnapshot.docs.isNotEmpty) {
+        return usersSnapshot.docs.length;
+      }
+
+      // Fallback 1: count users who made swaps in last 30 days
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-      final snapshot = await _db
+      final swapsSnapshot = await _db
           .collection('swaps')
           .where('createdAt', isGreaterThan: Timestamp.fromDate(thirtyDaysAgo))
           .get();
 
       final userIds = <String>{};
-      for (final doc in snapshot.docs) {
+      for (final doc in swapsSnapshot.docs) {
         final data = doc.data();
-        userIds.add(data['fromUserId'] as String);
-        userIds.add(data['toUserId'] as String);
+        if (data['fromUserId'] != null)
+          userIds.add(data['fromUserId'] as String);
+        if (data['toUserId'] != null) userIds.add(data['toUserId'] as String);
       }
 
-      return userIds.length;
+      if (userIds.isNotEmpty) {
+        return userIds.length;
+      }
+
+      // Fallback 2: count all users created in last 30 days
+      final allUsersSnapshot = await _db
+          .collection('users')
+          .where('createdAt', isGreaterThan: Timestamp.fromDate(thirtyDaysAgo))
+          .get();
+
+      return allUsersSnapshot.docs.length;
     } catch (e) {
       print('Error getting active users: $e');
       return 0;

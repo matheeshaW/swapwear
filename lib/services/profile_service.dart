@@ -13,7 +13,14 @@ class ProfileService {
   Future<void> ensureUserProfile({required User user}) async {
     final docRef = _usersCol.doc(user.uid);
     final snap = await docRef.get();
-    if (snap.exists) return;
+    if (snap.exists) {
+      // Update lastActiveAt even if profile exists
+      await docRef.update({
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
 
     await docRef.set({
       'uid': user.uid,
@@ -25,6 +32,7 @@ class ProfileService {
       'history': <String>[],
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+      'lastActiveAt': FieldValue.serverTimestamp(),
     });
   }
 
@@ -51,5 +59,17 @@ class ProfileService {
 
   Future<void> deactivateAccount({required String uid}) async {
     await _usersCol.doc(uid).delete();
+  }
+
+  // Update user activity timestamp
+  Future<void> updateUserActivity(String uid) async {
+    try {
+      await _usersCol.doc(uid).update({
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error updating user activity: $e');
+    }
   }
 }

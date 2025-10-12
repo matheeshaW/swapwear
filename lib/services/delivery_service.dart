@@ -42,6 +42,7 @@ class DeliveryService {
       final batch = _db.batch();
 
       // Create delivery record for the sender (fromUserId)
+      // This delivery picks up from fromUserId's location and delivers to toUserId's location
       final fromDeliveryRef = _deliveries.doc('${swapId}_$fromUserId');
       final fromDelivery = DeliveryModel(
         swapId: swapId,
@@ -61,14 +62,15 @@ class DeliveryService {
         pickupLongitude: pickupLongitude,
         deliveryLatitude: deliveryLatitude,
         deliveryLongitude: deliveryLongitude,
-        pickupAddress: pickupAddress,
-        deliveryAddress: deliveryAddress,
+        pickupAddress: pickupAddress, // Pick up from fromUserId's location
+        deliveryAddress: deliveryAddress, // Deliver to toUserId's location
         distanceKm: distanceKm,
         co2SavedKg: co2SavedKg,
         routePolyline: routePolyline,
       );
 
       // Create delivery record for the receiver (toUserId)
+      // This delivery picks up from toUserId's location and delivers to fromUserId's location
       final toDeliveryRef = _deliveries.doc('${swapId}_$toUserId');
       final toDelivery = DeliveryModel(
         swapId: swapId,
@@ -84,12 +86,18 @@ class DeliveryService {
         ownerId: toUserId,
         partnerId: fromUserId,
         swapPairId: swapPairId,
-        pickupLatitude: pickupLatitude,
-        pickupLongitude: pickupLongitude,
-        deliveryLatitude: deliveryLatitude,
-        deliveryLongitude: deliveryLongitude,
-        pickupAddress: pickupAddress,
-        deliveryAddress: deliveryAddress,
+        pickupLatitude:
+            deliveryLatitude, // Pick up from toUserId's location (swapped)
+        pickupLongitude:
+            deliveryLongitude, // Pick up from toUserId's location (swapped)
+        deliveryLatitude:
+            pickupLatitude, // Deliver to fromUserId's location (swapped)
+        deliveryLongitude:
+            pickupLongitude, // Deliver to fromUserId's location (swapped)
+        pickupAddress:
+            deliveryAddress, // Pick up from toUserId's location (swapped)
+        deliveryAddress:
+            pickupAddress, // Deliver to fromUserId's location (swapped)
         distanceKm: distanceKm,
         co2SavedKg: co2SavedKg,
         routePolyline: routePolyline,
@@ -300,6 +308,33 @@ class DeliveryService {
     });
   }
 
+  // Stream both deliveries for a swap (for dual delivery tracking)
+  Stream<List<DeliveryModel>> streamDeliveriesBySwapId(String swapId) {
+    print('DeliveryService - Streaming both deliveries for swap: $swapId');
+    return _deliveries
+        .where('swapId', isEqualTo: swapId)
+        .snapshots()
+        .map((snapshot) {
+      print(
+        'DeliveryService - Found ${snapshot.docs.length} deliveries for swapId: $swapId',
+      );
+      final deliveries = snapshot.docs
+          .map((doc) => DeliveryModel.fromMap(doc.data(), doc.id))
+          .toList();
+      
+      // Sort by ownerId to ensure consistent order
+      deliveries.sort((a, b) => a.ownerId.compareTo(b.ownerId));
+      
+      for (final delivery in deliveries) {
+        print(
+          'DeliveryService - Delivery: ${delivery.itemName} (${delivery.status}) - Owner: ${delivery.ownerId}',
+        );
+      }
+      
+      return deliveries;
+    });
+  }
+
   // Update delivery location
   Future<void> updateDeliveryLocation({
     required String swapId,
@@ -333,6 +368,14 @@ class DeliveryService {
           print(
             'DeliveryService - Found ${snapshot.docs.length} deliveries for provider: $providerId',
           );
+
+          // Debug: Print all delivery documents for this provider
+          for (final doc in snapshot.docs) {
+            print(
+              'DeliveryService - Delivery doc: ${doc.id}, data: ${doc.data()}',
+            );
+          }
+
           final deliveries = snapshot.docs
               .map((doc) => DeliveryModel.fromMap(doc.data(), doc.id))
               .toList();
