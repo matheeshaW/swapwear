@@ -37,17 +37,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _error = null;
     });
     try {
-      final credential = await _authService.signUpWithEmail(
+      await _authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      final userId = credential.user?.uid ?? '';
+
       if (mounted) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/browse',
-          arguments: {'userId': userId},
+        // Show success message and redirect to login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Please sign in.'),
+            backgroundColor: Colors.green,
+          ),
         );
+
+        // Redirect to login screen
+        Navigator.pushReplacementNamed(context, '/login');
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message);

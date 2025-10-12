@@ -547,6 +547,7 @@ class _AddListingStep2ScreenState extends State<AddListingStep2Screen> {
         'description': widget.listingData.description,
         'category': widget.listingData.category,
         'tags': _tags,
+        'isAvailable': true, // New listings are available by default
         'timestamp': FieldValue.serverTimestamp(),
       });
 

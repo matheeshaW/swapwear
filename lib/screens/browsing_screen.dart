@@ -26,6 +26,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
   bool _isAdmin = false;
   bool _loading = true;
   List<String> _userPreferences = [];
+  String _searchQuery = '';
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userPrefSub;
 
   // for wishlist state
@@ -162,6 +163,9 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
     final hasSize = selectedSize != null && selectedSize != 'All';
     final hasCondition =
         selectedCondition != null && selectedCondition != 'All';
+
+    // Note: We'll filter for availability in the client-side code to handle
+    // existing listings that don't have the isAvailable field
 
     if (hasCategory) {
       query = query.where('category', isEqualTo: selectedCategory);
@@ -526,9 +530,7 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onChanged: (val) {
-                // Optionally implement search logic
-              },
+              onChanged: (val) => setState(() => _searchQuery = val.trim()),
             ),
           ),
         ),
@@ -589,10 +591,24 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                   }
                   final docs = snapshot.data!.docs;
 
+                  // Filter for available listings (isAvailable: true OR isAvailable field doesn't exist)
+                  final availableDocs = docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final isAvailable = data['isAvailable'];
+                    // If isAvailable field doesn't exist, treat as available (for existing listings)
+                    return isAvailable != false; // true or null/undefined
+                  }).toList();
+
+                  if (availableDocs.isEmpty) {
+                    return const Center(
+                      child: Text('No available listings found.'),
+                    );
+                  }
+
                   // (filters detection reserved for future use)
 
                   // Start with a copy
-                  final sortedDocs = docs.toList();
+                  final sortedDocs = availableDocs.toList();
 
                   // Sort by number of preference matches (descending), then timestamp
                   sortedDocs.sort((a, b) {
@@ -613,19 +629,48 @@ class _BrowsingScreenState extends State<BrowsingScreen> {
                     final cmp = ta.compareTo(tb);
                     return (sortBy == 'Newest') ? -cmp : cmp;
                   });
+
+                  // Apply search filter if present
+                  List<QueryDocumentSnapshot> displayDocs = sortedDocs;
+                  if (_searchQuery.isNotEmpty) {
+                    final q = _searchQuery.toLowerCase();
+                    displayDocs = sortedDocs.where((d) {
+                      final data = d.data() as Map<String, dynamic>;
+                      final title = (data['title'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final category = (data['category'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      if (title.contains(q) || category.contains(q))
+                        return true;
+                      final rawTags = data['tags'];
+                      if (rawTags is List) {
+                        for (var t in rawTags) {
+                          if (t.toString().toLowerCase().contains(q))
+                            return true;
+                        }
+                      } else if (rawTags is String &&
+                          rawTags.toLowerCase().contains(q)) {
+                        return true;
+                      }
+                      return false;
+                    }).toList();
+                  }
+
                   return ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
                     ),
-                    itemCount: sortedDocs.length,
+                    itemCount: displayDocs.length,
                     separatorBuilder: (context, idx) =>
                         const SizedBox(height: 14),
                     cacheExtent: 1000, // Preload items for smoother scrolling
                     itemBuilder: (context, idx) {
                       final data =
-                          sortedDocs[idx].data() as Map<String, dynamic>;
-                      final listingId = sortedDocs[idx].id;
+                          displayDocs[idx].data() as Map<String, dynamic>;
+                      final listingId = displayDocs[idx].id;
                       return Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(

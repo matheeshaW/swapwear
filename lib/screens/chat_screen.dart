@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart';
-
 import '../models/message_model.dart';
 import '../services/swap_service.dart';
 import 'confirm_swap_screen.dart';
@@ -12,6 +11,7 @@ class ChatScreen extends StatefulWidget {
   final String chatId;
   final String currentUserId;
   final String? swapId;
+
   const ChatScreen({
     super.key,
     required this.chatId,
@@ -23,38 +23,110 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ChatService _chatService = ChatService();
   bool _sending = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Mark messages as read when opening chat
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ChatService().markUnreadAsSeen(widget.chatId, widget.currentUserId);
+      _markMessagesAsRead();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Mark messages as read when app comes to foreground
+    if (state == AppLifecycleState.resumed) {
+      _markMessagesAsRead();
+    }
+  }
+
+  /// Mark all unread messages as read for current user
+  Future<void> _markMessagesAsRead() async {
+    try {
+      await _chatService.markMessagesAsRead(
+        widget.chatId,
+        widget.currentUserId,
+      );
+    } catch (e) {
+      debugPrint('Error marking messages as read: $e');
+    }
   }
 
   void _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _sending) return;
+
     setState(() => _sending = true);
+
     try {
-      await ChatService().sendMessage(
+      // Get receiver ID from swap if available
+      String? receiverId;
+      if (widget.swapId != null) {
+        final swapDoc = await FirebaseFirestore.instance
+            .collection('swaps')
+            .doc(widget.swapId)
+            .get();
+
+        if (swapDoc.exists) {
+          final swapData = swapDoc.data();
+          final fromUserId = swapData?['fromUserId'];
+          final toUserId = swapData?['toUserId'];
+
+          // Set receiver as the other user in the swap
+          receiverId = widget.currentUserId == fromUserId
+              ? toUserId
+              : fromUserId;
+        }
+      }
+
+      await _chatService.sendMessage(
         widget.chatId,
         widget.currentUserId,
         text,
+        receiverId: receiverId,
       );
+
       _controller.clear();
+
+      // Scroll to bottom after sending
       await Future.delayed(const Duration(milliseconds: 100));
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error sending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() => _sending = false);
+      if (mounted) {
+        setState(() => _sending = false);
+      }
     }
   }
 
@@ -72,27 +144,27 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (isRejected) {
       icon = Icons.cancel_outlined;
-      color = const Color(0xFFEF4444); // Softer red
+      color = const Color(0xFFEF4444);
       text = 'Swap Declined';
       subtitle = 'This swap request was declined';
     } else if (swap['status'] == 'ready_for_delivery') {
       icon = Icons.local_shipping;
-      color = const Color(0xFF10B981); // Emerald green
+      color = const Color(0xFF10B981);
       text = 'Swap Completed';
       subtitle = 'Both locations confirmed! Ready for delivery';
     } else if (swap['status'] == 'confirmed') {
       icon = Icons.check_circle_outline;
-      color = const Color(0xFF10B981); // Emerald green
+      color = const Color(0xFF10B981);
       text = 'Swap Confirmed';
       subtitle = 'You can now arrange the exchange';
     } else if (isAccepted) {
       icon = Icons.pending_outlined;
-      color = const Color(0xFF14B8A6); // Teal
+      color = const Color(0xFF14B8A6);
       text = 'Awaiting Confirmation';
       subtitle = 'Waiting for final approval';
     } else {
       icon = Icons.access_time_outlined;
-      color = const Color(0xFF06B6D4); // Cyan
+      color = const Color(0xFF06B6D4);
       text = 'Pending Response';
       subtitle = 'Waiting for receiver to accept';
     }
@@ -103,10 +175,7 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFD1FAE5),
-          width: 1,
-        ), // Mint border
+        border: Border.all(color: const Color(0xFFD1FAE5), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,6 +224,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           listingRequestedId.isEmpty)
                         return;
                       if (!context.mounted) return;
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -167,7 +237,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981), // Emerald green
+                      backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 11),
@@ -194,9 +264,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444), // Softer red
+                      foregroundColor: const Color(0xFFEF4444),
                       side: const BorderSide(
-                        color: Color(0xFFD1FAE5), // Mint border
+                        color: Color(0xFFD1FAE5),
                         width: 1,
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 11),
@@ -232,12 +302,10 @@ class _ChatScreenState extends State<ChatScreen> {
         swap['user02LocationConfirmed'] as bool? ?? false;
     final bothConfirmed = swap['bothConfirmed'] as bool? ?? false;
 
-    // Only show banner if swap is confirmed but both locations not confirmed
     if (status != 'confirmed' || bothConfirmed) {
       return const SizedBox.shrink();
     }
 
-    // Check if current user needs to add location
     final fromUserId = swap['fromUserId'] as String?;
     final toUserId = swap['toUserId'] as String?;
 
@@ -284,8 +352,8 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
+              children: const [
+                Text(
                   '📍 Please provide your delivery location',
                   style: TextStyle(
                     color: Color(0xFF2D9D78),
@@ -293,8 +361,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: 4),
+                Text(
                   'Add your location to complete the swap setup.',
                   style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
                 ),
@@ -303,7 +371,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: () => _showLocationSelectionModal(),
+            onPressed: _showLocationSelectionModal,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2D9D78),
               foregroundColor: Colors.white,
@@ -333,7 +401,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     if (result == true && mounted) {
-      // Refresh the UI or show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Location added successfully!'),
@@ -346,29 +413,28 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildAppBarTitleWithStatus(Map<String, dynamic> swap) {
     String status = swap['status'] ?? '';
     String displayStatus = status;
-    Color statusColor = const Color(0xFF14B8A6); // Default teal
+    Color statusColor = const Color(0xFF14B8A6);
 
-    // Convert status to user-friendly display
     switch (status) {
       case 'ready_for_delivery':
         displayStatus = 'COMPLETED';
-        statusColor = const Color(0xFF10B981); // Green
+        statusColor = const Color(0xFF10B981);
         break;
       case 'confirmed':
         displayStatus = 'CONFIRMED';
-        statusColor = const Color(0xFF10B981); // Green
+        statusColor = const Color(0xFF10B981);
         break;
       case 'accepted':
         displayStatus = 'ACCEPTED';
-        statusColor = const Color(0xFF14B8A6); // Teal
+        statusColor = const Color(0xFF14B8A6);
         break;
       case 'pending':
         displayStatus = 'PENDING';
-        statusColor = const Color(0xFF06B6D4); // Cyan
+        statusColor = const Color(0xFF06B6D4);
         break;
       case 'rejected':
         displayStatus = 'DECLINED';
-        statusColor = const Color(0xFFEF4444); // Red
+        statusColor = const Color(0xFFEF4444);
         break;
     }
 
@@ -402,7 +468,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     if (widget.swapId == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF0FDF4), // Mint background
+        backgroundColor: const Color(0xFFF0FDF4),
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -413,6 +479,7 @@ class _ChatScreenState extends State<ChatScreen> {
         body: _buildChatBody(),
       );
     }
+
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('swaps')
@@ -420,9 +487,10 @@ class _ChatScreenState extends State<ChatScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         final swap = snapshot.data?.data() as Map<String, dynamic>?;
+
         if (swap == null) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF0FDF4), // Mint background
+            backgroundColor: const Color(0xFFF0FDF4),
             appBar: AppBar(
               backgroundColor: Colors.white,
               elevation: 0,
@@ -437,14 +505,16 @@ class _ChatScreenState extends State<ChatScreen> {
             body: _buildChatBody(),
           );
         }
+
         final status = swap['status'] ?? '';
         final toUserId = swap['toUserId'] ?? '';
         final isRecipient = widget.currentUserId == toUserId;
         final isPending = status == 'pending';
         final isAccepted = status == 'accepted';
         final isRejected = status == 'rejected';
+
         return Scaffold(
-          backgroundColor: const Color(0xFFF0FDF4), // Mint background
+          backgroundColor: const Color(0xFFF0FDF4),
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -480,16 +550,25 @@ class _ChatScreenState extends State<ChatScreen> {
       children: [
         Expanded(
           child: StreamBuilder<List<MessageModel>>(
-            stream: ChatService().getMessagesStream(widget.chatId),
+            stream: _chatService.getMessagesStream(widget.chatId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF10B981),
-                  ), // Emerald
+                  child: CircularProgressIndicator(color: Color(0xFF10B981)),
                 );
               }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error loading messages: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                );
+              }
+
               final messages = snapshot.data ?? [];
+
               if (messages.isEmpty) {
                 return const Center(
                   child: Text(
@@ -498,6 +577,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 );
               }
+
               return ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(
@@ -508,10 +588,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 itemBuilder: (context, idx) {
                   final msg = messages[idx];
                   final isMe = msg.senderId == widget.currentUserId;
-                  final seen = msg.seen == true;
-                  final ts = msg.timestamp is Timestamp
-                      ? (msg.timestamp as Timestamp).toDate()
-                      : null;
+                  final isRead = msg.isRead;
+                  final ts = msg.timestamp?.toDate();
 
                   // Show date separator
                   bool showDate = false;
@@ -519,9 +597,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     showDate = true;
                   } else {
                     final prevMsg = messages[idx - 1];
-                    final prevTs = prevMsg.timestamp is Timestamp
-                        ? (prevMsg.timestamp as Timestamp).toDate()
-                        : null;
+                    final prevTs = prevMsg.timestamp?.toDate();
                     if (ts != null && prevTs != null) {
                       showDate =
                           ts.day != prevTs.day ||
@@ -559,9 +635,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: isMe
-                                ? const Color(
-                                    0xFF10B981,
-                                  ) // Emerald for sent messages
+                                ? const Color(0xFF10B981)
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -592,18 +666,23 @@ class _ChatScreenState extends State<ChatScreen> {
                                             : const Color(0xFF94A3B8),
                                       ),
                                     ),
+                                  // Read receipts for sent messages (WhatsApp style)
                                   if (isMe) ...[
                                     const SizedBox(width: 4),
                                     Icon(
-                                      seen
-                                          ? Icons.done_all_rounded
-                                          : Icons.done_rounded,
-                                      size: 14,
-                                      color: seen
+                                      isRead
+                                          ? Icons
+                                                .done_all_rounded // Double check when read
+                                          : Icons
+                                                .check_rounded, // Single check when delivered
+                                      size: 16,
+                                      color: isRead
                                           ? const Color(
-                                              0xFF34D399,
-                                            ) // Light emerald for seen
-                                          : Colors.white.withOpacity(0.7),
+                                              0xFF0EA5E9,
+                                            ) // Blue when read
+                                          : Colors.white.withOpacity(
+                                              0.7,
+                                            ), // Grey when delivered
                                     ),
                                   ],
                                 ],
@@ -630,7 +709,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5), // Light mint
+                      color: const Color(0xFFECFDF5),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: TextField(
@@ -659,7 +738,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   height: 48,
                   width: 48,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF10B981), // Emerald green
+                    color: Color(0xFF10B981),
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(

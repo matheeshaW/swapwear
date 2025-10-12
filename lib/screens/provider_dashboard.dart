@@ -40,7 +40,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
           final data = doc.data();
           setState(() {
             _providerName = data?['name'] ?? 'Provider';
-            _providerId = user.uid;
+            // Use the main delivery provider ID so all providers see all deliveries
+            _providerId = 'main_delivery_provider';
             _isLoading = false;
           });
           print(
@@ -49,7 +50,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         } else {
           setState(() {
             _providerName = 'Provider';
-            _providerId = user.uid;
+            // Use the main delivery provider ID so all providers see all deliveries
+            _providerId = 'main_delivery_provider';
             _isLoading = false;
           });
           print(
@@ -78,7 +80,8 @@ class _ProviderDashboardState extends State<ProviderDashboard> {
         print('Provider Dashboard - Error loading provider data: $e');
         setState(() {
           _providerName = 'Provider';
-          _providerId = user.uid;
+          // Use the main delivery provider ID so all providers see all deliveries
+          _providerId = 'main_delivery_provider';
           _isLoading = false;
         });
       }
