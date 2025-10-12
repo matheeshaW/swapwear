@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/message_model.dart';
 import 'notification_service.dart';
 
@@ -9,23 +10,32 @@ class ChatService {
   ChatService({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance;
 
-  Future<void> sendMessage(String chatId, String senderId, String text) async {
+  /// Send a message with isRead set to false initially
+  Future<void> sendMessage(
+    String chatId,
+    String senderId,
+    String text, {
+    String? receiverId,
+  }) async {
     try {
       final msgRef = _db
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .doc();
+
       await msgRef.set({
         'senderId': senderId,
+        'receiverId': receiverId,
         'text': text,
         'timestamp': FieldValue.serverTimestamp(),
-        'seen': false,
+        'isRead': false, // Changed from 'seen' to 'isRead'
       });
 
       // Send notification to other participants
       await _sendChatNotification(chatId, senderId, text);
     } catch (e) {
+      debugPrint('Failed to send message: $e');
       throw Exception('Failed to send message: $e');
     }
   }
@@ -44,28 +54,61 @@ class ChatService {
                 .toList(),
           );
     } catch (e) {
-      // Return empty stream on error
+      debugPrint('Error getting messages stream: $e');
       return const Stream<List<MessageModel>>.empty();
     }
   }
 
+  /// Mark messages as read for the current user (WhatsApp-style)
+  Future<void> markMessagesAsRead(String chatId, String currentUserId) async {
+    try {
+      // Query unread messages where current user is the receiver
+      final query = await _db
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      if (query.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      for (final doc in query.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+
+      debugPrint('Marked ${query.docs.length} messages as read');
+    } catch (e) {
+      debugPrint('Failed to mark messages as read: $e');
+    }
+  }
+
+  /// Legacy method for backward compatibility
   Future<void> markUnreadAsSeen(String chatId, String currentUserId) async {
     try {
-      final query = await _db
+      // First try the new method with receiverId
+      await markMessagesAsRead(chatId, currentUserId);
+
+      // Fallback: Also handle old 'seen' field for backward compatibility
+      final oldQuery = await _db
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .where('seen', isEqualTo: false)
           .where('senderId', isNotEqualTo: currentUserId)
           .get();
-      if (query.docs.isEmpty) return;
-      final batch = _db.batch();
-      for (final doc in query.docs) {
-        batch.update(doc.reference, {'seen': true});
+
+      if (oldQuery.docs.isNotEmpty) {
+        final batch = _db.batch();
+        for (final doc in oldQuery.docs) {
+          batch.update(doc.reference, {'seen': true, 'isRead': true});
+        }
+        await batch.commit();
       }
-      await batch.commit();
     } catch (e) {
-      throw Exception('Failed to mark messages as seen: $e');
+      debugPrint('Failed to mark messages as seen: $e');
     }
   }
 
@@ -79,6 +122,24 @@ class ChatService {
           .delete();
     } catch (e) {
       throw Exception('Failed to delete message: $e');
+    }
+  }
+
+  /// Get unread message count for a specific chat
+  Future<int> getUnreadMessageCount(String chatId, String userId) async {
+    try {
+      final unreadMessages = await _db
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      return unreadMessages.docs.length;
+    } catch (e) {
+      debugPrint('Error getting unread count: $e');
+      return 0;
     }
   }
 
@@ -124,7 +185,7 @@ class ChatService {
       }
     } catch (e) {
       // Don't throw error for notification failure
-      print('Failed to send chat notification: $e');
+      debugPrint('Failed to send chat notification: $e');
     }
   }
 }
